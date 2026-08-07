@@ -5,4 +5,6 @@ export const ADMIN_MESSAGES = {
   SESSION_ALREADY_REVOKED: 'Session is already revoked',
   SESSION_REVOKED: 'Session revoked successfully',
   CANNOT_BAN_SELF: 'You cannot ban yourself',
+  CANNOT_REVOKE_OWN_SESSION:
+    'You cannot revoke your own active session from the admin panel',
 } as const;
