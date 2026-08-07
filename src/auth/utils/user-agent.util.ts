@@ -1,7 +1,6 @@
-export type ParsedUserAgent = {
-  browser: string | null;
-  operatingSystem: string | null;
-};
+import { ParsedUserAgent } from 'src/common/types';
+
+export type { ParsedUserAgent };
 
 export function parseUserAgent(
   userAgent: string | null | undefined,
