@@ -3,7 +3,7 @@ import type { Response } from 'express';
 import { AUTH_MESSAGES } from 'src/common/constants/messages.constant';
 import type { AuthUser } from 'src/common/types/auth-user.type';
 import { TokensService } from 'src/tokens/tokens.service';
-import { UsersRepository } from '../repositories/users.repository';
+import { UsersRepository } from '../../repositories/users.repository';
 
 @Injectable()
 export class DeleteMeService {

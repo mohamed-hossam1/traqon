@@ -1,10 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { SWAGGER_EXAMPLES } from 'src/common/constants/examples.constant';
 import { VALIDATION_MESSAGES } from 'src/common/constants/messages.constant';
 
 export class BanUserDto {
   @ApiProperty({
-    example: 'Violation of community guidelines',
+    example: SWAGGER_EXAMPLES.banReason,
     description: 'Reason the user is being banned',
     maxLength: 500,
   })

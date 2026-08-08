@@ -5,18 +5,24 @@ import {
 } from '@nestjs/common';
 import { ADMIN_MESSAGES } from 'src/common/constants/messages.constant';
 import type { AuthUser } from 'src/common/types/auth-user.type';
+import { TokensService } from 'src/tokens/tokens.service';
 import { db } from 'src/db';
-import { RefreshSessionsRepository } from '../repositories/refresh-sessions.repository';
-import { AdminAuditLogRepository } from '../repositories/admin-audit-log.repository';
+import { RefreshSessionsRepository } from '../../repositories/refresh-sessions.repository';
+import { AdminAuditLogRepository } from '../../repositories/admin-audit-log.repository';
 
 @Injectable()
 export class AdminRevokeSessionService {
   constructor(
     private readonly refreshSessionsRepository: RefreshSessionsRepository,
     private readonly adminAuditLogRepository: AdminAuditLogRepository,
+    private readonly tokensService: TokensService,
   ) {}
 
   async revoke(currentUser: AuthUser, userId: string, sessionId: string) {
+    if (currentUser.sessionId === sessionId) {
+      throw new BadRequestException(ADMIN_MESSAGES.CANNOT_REVOKE_OWN_SESSION);
+    }
+
     const session = await this.refreshSessionsRepository.findById(sessionId);
 
     if (!session || session.userId !== userId) {
@@ -45,6 +51,8 @@ export class AdminRevokeSessionService {
         tx,
       );
     });
+
+    await this.tokensService.blacklistSession(sessionId);
 
     return { message: ADMIN_MESSAGES.SESSION_REVOKED };
   }

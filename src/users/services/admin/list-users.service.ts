@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { UsersRepository } from '../repositories/users.repository';
-import { ListUsersQueryDto } from '../dtos/list-users-query.dto';
-import { toPublicUser } from '../utils/users.mapper';
+import { UsersRepository } from '../../repositories/users.repository';
+import { ListUsersQueryDto } from '../../dtos/list-users-query.dto';
+import { toPublicUser } from '../../utils/users.mapper';
 
 @Injectable()
 export class ListUsersService {

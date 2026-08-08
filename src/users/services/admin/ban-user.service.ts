@@ -9,18 +9,20 @@ import {
 } from 'src/common/constants/messages.constant';
 import type { AuthUser } from 'src/common/types/auth-user.type';
 import { db } from 'src/db';
-import { BanUserDto } from '../dtos/ban-user.dto';
-import { UsersRepository } from '../repositories/users.repository';
-import { RefreshSessionsRepository } from '../repositories/refresh-sessions.repository';
-import { AdminAuditLogRepository } from '../repositories/admin-audit-log.repository';
-import { toPublicUser } from '../utils/users.mapper';
+import { BanUserDto } from '../../dtos/ban-user.dto';
+import { UsersRepository } from '../../repositories/users.repository';
+import { AdminAuditLogRepository } from '../../repositories/admin-audit-log.repository';
+import { toPublicUser } from '../../utils/users.mapper';
+import { CacheManagerService } from 'src/common/cache/services/cache-manager.service';
+import { TokensService } from 'src/tokens/tokens.service';
 
 @Injectable()
 export class BanUserService {
   constructor(
     private readonly usersRepository: UsersRepository,
-    private readonly refreshSessionsRepository: RefreshSessionsRepository,
     private readonly adminAuditLogRepository: AdminAuditLogRepository,
+    private readonly tokensService: TokensService,
+    private readonly cacheManager: CacheManagerService,
   ) {}
 
   async ban(currentUser: AuthUser, targetUserId: string, dto: BanUserDto) {
@@ -41,8 +43,6 @@ export class BanUserService {
           tx,
         );
 
-        await this.refreshSessionsRepository.revokeAll(targetUserId, tx);
-
         await this.adminAuditLogRepository.create(
           {
             adminId: currentUser.id,
@@ -56,6 +56,9 @@ export class BanUserService {
 
         return result;
       });
+
+      await this.tokensService.revokeAllSessions(targetUserId);
+      await this.cacheManager.invalidateUser(targetUserId);
 
       return {
         message: AUTH_MESSAGES.USER_BANNED_SUCCESS,

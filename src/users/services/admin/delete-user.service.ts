@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { AUTH_MESSAGES } from 'src/common/constants/messages.constant';
-import { UsersRepository } from '../repositories/users.repository';
+import { UsersRepository } from '../../repositories/users.repository';
 
 @Injectable()
 export class DeleteUserService {

@@ -6,15 +6,18 @@ import {
 import { AUTH_MESSAGES } from 'src/common/constants/messages.constant';
 import type { AuthUser } from 'src/common/types/auth-user.type';
 import { db } from 'src/db';
-import { UsersRepository } from '../repositories/users.repository';
-import { AdminAuditLogRepository } from '../repositories/admin-audit-log.repository';
-import { toPublicUser } from '../utils/users.mapper';
+import { UsersRepository } from '../../repositories/users.repository';
+import { AdminAuditLogRepository } from '../../repositories/admin-audit-log.repository';
+import { toPublicUser } from '../../utils/users.mapper';
+
+import { CacheManagerService } from 'src/common/cache/services/cache-manager.service';
 
 @Injectable()
 export class UnbanUserService {
   constructor(
     private readonly usersRepository: UsersRepository,
     private readonly adminAuditLogRepository: AdminAuditLogRepository,
+    private readonly cacheManager: CacheManagerService,
   ) {}
 
   async unban(currentUser: AuthUser, targetUserId: string) {
@@ -48,6 +51,8 @@ export class UnbanUserService {
     if (!user) {
       throw new NotFoundException(AUTH_MESSAGES.USER_NOT_FOUND);
     }
+
+    await this.cacheManager.invalidateUser(targetUserId);
 
     return {
       message: AUTH_MESSAGES.USER_UNBANNED_SUCCESS,

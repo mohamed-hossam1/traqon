@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ADMIN_MESSAGES } from 'src/common/constants/messages.constant';
-import { UsersRepository } from '../repositories/users.repository';
-import { RefreshSessionsRepository } from '../repositories/refresh-sessions.repository';
+import { UsersRepository } from '../../repositories/users.repository';
+import { RefreshSessionsRepository } from '../../repositories/refresh-sessions.repository';
 
 @Injectable()
 export class AdminListUserSessionsService {

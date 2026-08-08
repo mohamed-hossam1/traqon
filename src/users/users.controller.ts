@@ -27,21 +27,23 @@ import { User } from 'src/common/decorators/user.decorator';
 import { AuthGuard } from 'src/common/guards/auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import type { AuthUser } from 'src/common/types/auth-user.type';
-import { BanUserDto } from './dtos/ban-user.dto';
-import { UpdateUserDto } from './dtos/update-user.dto';
-import { ListUsersQueryDto } from './dtos/list-users-query.dto';
-import { BanUserService } from './services/ban-user.service';
-import { UnbanUserService } from './services/unban-user.service';
-import { ListUsersService } from './services/list-users.service';
-import { GetUserService } from './services/get-user.service';
-import { AdminListUserSessionsService } from './services/admin-list-user-sessions.service';
-import { AdminRevokeSessionService } from './services/admin-revoke-session.service';
-import { DeleteUserService } from './services/delete-user.service';
-import { DeleteMeService } from './services/delete-me.service';
-import { UpdateUserService } from './services/update-user.service';
-import { UpdateMeService } from './services/update-me.service';
+import { BanUserDto, UpdateUserDto, ListUsersQueryDto } from './dtos';
+import { Cacheable } from 'src/common/cache/decorators/cacheable.decorator';
+import { InvalidateCache } from 'src/common/cache/decorators/invalidate-cache.decorator';
 import { ROLES } from 'src/db/schema';
 import { UsersRepository } from './repositories/users.repository';
+import {
+  DeleteUserService,
+  DeleteMeService,
+  UpdateUserService,
+  UpdateMeService,
+  BanUserService,
+  UnbanUserService,
+  ListUsersService,
+  GetUserService,
+  AdminListUserSessionsService,
+  AdminRevokeSessionService,
+} from './services';
 
 @ApiTags('users')
 @Controller('users')
@@ -86,14 +88,15 @@ export class UsersController {
 
   @Get('me')
   @UseGuards(AuthGuard)
+  @Cacheable({ scope: 'user', ttl: 300 })
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current authenticated user profile' })
   async me(@User() user: AuthUser) {
     const currentUser = await this.usersRepository.findById(user.id);
-
     return {
       user: {
         id: user.id,
+        sessionId: user.sessionId,
         email: user.email,
         name: user.name,
         avatarUrl: user.avatarUrl,
@@ -109,6 +112,10 @@ export class UsersController {
   @Get(':id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(ROLES.ADMIN)
+  @Cacheable({
+    key: (req) => `cache:user:detail:${String(req.params.id)}`,
+    ttl: 300,
+  })
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Get user details (admin)',
@@ -169,6 +176,7 @@ export class UsersController {
   @Patch('me')
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard)
+  @InvalidateCache({ invalidateUser: true })
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Update current user profile',
@@ -183,6 +191,7 @@ export class UsersController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(ROLES.ADMIN)
+  @InvalidateCache({ invalidateUser: true })
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Update a user profile',
@@ -203,6 +212,7 @@ export class UsersController {
   @Delete('me')
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard)
+  @InvalidateCache({ invalidateUser: true })
   @ApiBearerAuth()
   @ApiCookieAuth('refresh_token')
   @ApiOperation({
@@ -218,6 +228,7 @@ export class UsersController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(ROLES.ADMIN)
+  @InvalidateCache({ invalidateUser: true })
   @ApiBearerAuth()
   @ApiCookieAuth('refresh_token')
   @ApiOperation({
@@ -237,6 +248,9 @@ export class UsersController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(ROLES.ADMIN)
+  @InvalidateCache({
+    keys: (req) => [`cache:user:detail:${String(req.params.id)}`],
+  })
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Ban a user',
@@ -260,6 +274,9 @@ export class UsersController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(ROLES.ADMIN)
+  @InvalidateCache({
+    keys: (req) => [`cache:user:detail:${String(req.params.id)}`],
+  })
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Unban a user',

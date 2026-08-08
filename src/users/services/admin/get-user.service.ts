@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ADMIN_MESSAGES } from 'src/common/constants/messages.constant';
-import { UsersRepository } from '../repositories/users.repository';
-import { toPublicUser } from '../utils/users.mapper';
+import { UsersRepository } from '../../repositories/users.repository';
+import { toPublicUser } from '../../utils/users.mapper';
 
 @Injectable()
 export class GetUserService {
