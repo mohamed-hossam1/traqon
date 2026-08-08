@@ -7,8 +7,7 @@ import { AUTH_MESSAGES } from 'src/common/constants/messages.constant';
 import { db } from 'src/db';
 import { HashingService } from 'src/hashing/hashing.service';
 import { UsersRepository } from 'src/users/repositories/users.repository';
-import { RefreshSessionsRepository } from 'src/users/repositories/refresh-sessions.repository';
-import { SetPasswordDto } from '../dtos/set-password.dto';
+import { SetPasswordDto } from '../../dtos/set-password.dto';
 import { AuthUser } from 'src/common/types/auth-user.type';
 import { TokensService } from 'src/tokens/tokens.service';
 
@@ -16,7 +15,6 @@ import { TokensService } from 'src/tokens/tokens.service';
 export class SetPasswordService {
   constructor(
     private readonly usersRepository: UsersRepository,
-    private readonly refreshSessionsRepository: RefreshSessionsRepository,
     private readonly hashingService: HashingService,
     private readonly tokensService: TokensService,
   ) {}
@@ -42,23 +40,22 @@ export class SetPasswordService {
 
     await db.transaction(async (tx) => {
       await this.usersRepository.update(existingUser.id, { passwordHash }, tx);
-
-      if (setPasswordDto.revokeOtherSessions) {
-        const currentSessionId =
-          await this.tokensService.getSessionIdFromRefreshToken(
-            refreshToken,
-            existingUser.id,
-          );
-
-        if (currentSessionId) {
-          await this.refreshSessionsRepository.revokeAllExcept(
-            existingUser.id,
-            currentSessionId,
-            tx,
-          );
-        }
-      }
     });
+
+    if (setPasswordDto.revokeOtherSessions) {
+      const currentSessionId =
+        await this.tokensService.getSessionIdFromRefreshToken(
+          refreshToken,
+          existingUser.id,
+        );
+
+      if (currentSessionId) {
+        await this.tokensService.revokeAllOtherSessions(
+          existingUser.id,
+          currentSessionId,
+        );
+      }
+    }
 
     return { message: AUTH_MESSAGES.SET_PASSWORD_SUCCESS };
   }

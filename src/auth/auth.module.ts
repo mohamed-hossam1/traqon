@@ -6,23 +6,25 @@ import { TokensModule } from 'src/tokens/tokens.module';
 import { UsersModule } from 'src/users/users.module';
 import { EmailModule } from 'src/email/email.module';
 import { ConfigModule } from '@nestjs/config';
-import { SignUpService } from './services/sign-up.service';
-import { SignInService } from './services/sign-in.service';
-import { VerifyEmailService } from './services/verify-email.service';
-import { LogoutService } from './services/logout.service';
-import { ListSessionsService } from './services/list-sessions.service';
-import { RevokeSessionService } from './services/revoke-session.service';
-import { RevokeAllOtherSessionsService } from './services/revoke-all-other-sessions.service';
-import { ForgotPasswordService } from './services/forgot-password.service';
-import { ResetPasswordService } from './services/reset-password.service';
-import { ChangePasswordService } from './services/change-password.service';
-import { RefreshService } from './services/refresh.service';
-import { ResendVerificationEmailService } from './services/resend-verification-email.service';
-import { GoogleOauthLoginService } from './services/google-oauth-login.service';
-import { GoogleOauthCallbackService } from './services/google-oauth-callback.service';
-import { SetPasswordService } from './services/set-password.service';
-import { ListOauthAccountsService } from './services/list-oauth-accounts.service';
-import { UnlinkOauthAccountService } from './services/unlink-oauth-account.service';
+import {
+  SignUpService,
+  SignInService,
+  VerifyEmailService,
+  LogoutService,
+  ListSessionsService,
+  RevokeSessionService,
+  RevokeAllOtherSessionsService,
+  ForgotPasswordService,
+  ResetPasswordService,
+  ChangePasswordService,
+  RefreshService,
+  ResendVerificationEmailService,
+  GoogleOauthLoginService,
+  GoogleOauthCallbackService,
+  SetPasswordService,
+  ListOauthAccountsService,
+  UnlinkOauthAccountService,
+} from './services';
 
 @Module({
   imports: [

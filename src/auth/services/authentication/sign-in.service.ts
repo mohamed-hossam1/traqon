@@ -6,7 +6,7 @@ import { getClientIp } from 'src/common/utils/request.util';
 import { HashingService } from 'src/hashing/hashing.service';
 import { TokensService } from 'src/tokens/tokens.service';
 import { UsersRepository } from 'src/users/repositories/users.repository';
-import { SignInDto } from '../dtos/sign-in.dto';
+import { SignInDto } from '../../dtos/sign-in.dto';
 
 @Injectable()
 export class SignInService {

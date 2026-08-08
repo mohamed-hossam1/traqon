@@ -1,50 +1,50 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { SWAGGER_EXAMPLES } from 'src/common/constants/examples.constant';
 
 export class SessionResponseDto {
   @ApiProperty({
-    example: '550e8400-e29b-41d4-a716-446655440000',
+    example: SWAGGER_EXAMPLES.sessionId,
   })
   sessionId: string;
 
   @ApiPropertyOptional({
-    example:
-      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/150.0.0.0 Safari/537.36',
+    example: SWAGGER_EXAMPLES.userAgent,
     nullable: true,
   })
   userAgent: string | null;
 
   @ApiPropertyOptional({
-    example: 'Chrome',
+    example: SWAGGER_EXAMPLES.browser,
     nullable: true,
   })
   browser: string | null;
 
   @ApiPropertyOptional({
-    example: 'macOS',
+    example: SWAGGER_EXAMPLES.operatingSystem,
     nullable: true,
   })
   operatingSystem: string | null;
 
   @ApiPropertyOptional({
-    example: '203.0.113.42',
+    example: SWAGGER_EXAMPLES.ipAddress,
     nullable: true,
   })
   ipAddress: string | null;
 
   @ApiPropertyOptional({
-    example: 'Cairo, Egypt',
+    example: SWAGGER_EXAMPLES.location,
     nullable: true,
     description: 'Approximate location when available',
   })
   location: string | null;
 
   @ApiProperty({
-    example: '2026-07-20T10:00:00.000Z',
+    example: SWAGGER_EXAMPLES.createdAt,
   })
   createdAt: Date;
 
   @ApiProperty({
-    example: '2026-07-20T12:30:00.000Z',
+    example: SWAGGER_EXAMPLES.lastUsedAt,
   })
   lastUsedAt: Date;
 

@@ -6,7 +6,7 @@ import { db } from 'src/db';
 import { TokensService } from 'src/tokens/tokens.service';
 import { UsersRepository } from 'src/users/repositories/users.repository';
 import { AuthTokensRepository } from 'src/users/repositories/auth-tokens.repository';
-import { parseToken } from '../utils/token.util';
+import { parseToken } from '../../utils/token.util';
 import { compareSha256 } from 'src/common/utils/sha256.util';
 import { getClientIp } from 'src/common/utils/request.util';
 

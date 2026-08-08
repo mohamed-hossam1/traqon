@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AUTH_CONFIG } from 'src/common/constants/auth.constant';
 import { AUTH_MESSAGES } from 'src/common/constants/messages.constant';
@@ -7,11 +7,13 @@ import { UserWithRole, type EmailVerificationToken } from 'src/db/schema';
 import { EmailService } from 'src/email/email.service';
 import { VerificationEmail } from 'src/email/templates/verification.email';
 import { AuthTokensRepository } from 'src/users/repositories/auth-tokens.repository';
-import { formatToken, generateRandomToken } from '../utils/token.util';
+import { formatToken, generateRandomToken } from '../../utils/token.util';
 import { hashSha256 } from 'src/common/utils/sha256.util';
 
 @Injectable()
 export class ResendVerificationEmailService {
+  private readonly logger = new Logger(ResendVerificationEmailService.name);
+
   constructor(
     private readonly authTokensRepository: AuthTokensRepository,
     private readonly emailService: EmailService,
@@ -85,7 +87,12 @@ export class ResendVerificationEmailService {
       name,
       `${frontendUrl}/verify?token=${encodeURIComponent(verifyToken)}`,
     );
-    void this.emailService.send(verificationEmail).catch(() => undefined);
+    void this.emailService.send(verificationEmail).catch((error) => {
+      this.logger.error(
+        `Failed to send verification email to ${email}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    });
   }
 
   private canResendVerification(expiresAt: Date | string | null): boolean {

@@ -5,9 +5,11 @@ import { HashingService } from 'src/hashing/hashing.service';
 import { UsersRepository } from 'src/users/repositories/users.repository';
 import { AuthTokensRepository } from 'src/users/repositories/auth-tokens.repository';
 import { RefreshSessionsRepository } from 'src/users/repositories/refresh-sessions.repository';
-import { ResetPasswordDto } from '../dtos/reset-password.dto';
-import { parseToken } from '../utils/token.util';
+import { ResetPasswordDto } from '../../dtos/reset-password.dto';
+import { parseToken } from '../../utils/token.util';
 import { compareSha256 } from 'src/common/utils/sha256.util';
+
+import { TokensService } from 'src/tokens/tokens.service';
 
 @Injectable()
 export class ResetPasswordService {
@@ -16,6 +18,7 @@ export class ResetPasswordService {
     private readonly authTokensRepository: AuthTokensRepository,
     private readonly refreshSessionsRepository: RefreshSessionsRepository,
     private readonly hashingService: HashingService,
+    private readonly tokensService: TokensService,
   ) {}
 
   async resetPassword(resetPasswordDto: ResetPasswordDto) {
@@ -49,8 +52,9 @@ export class ResetPasswordService {
     await db.transaction(async (tx) => {
       await this.usersRepository.update(user.id, { passwordHash }, tx);
       await this.authTokensRepository.deletePasswordResetToken(user.id, tx);
-      await this.refreshSessionsRepository.revokeAll(user.id, tx);
     });
+
+    await this.tokensService.revokeAllSessions(user.id);
 
     return { message: AUTH_MESSAGES.RESET_PASSWORD_SUCCESS };
   }

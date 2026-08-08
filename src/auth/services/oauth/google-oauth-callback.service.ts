@@ -75,7 +75,7 @@ export class GoogleOauthCallbackService {
     }
 
     return {
-      sub: claims.sub,
+      providerUserId: claims.sub,
       email: claims.email,
       name: claims.name as string | undefined,
       picture: claims.picture as string | undefined,
@@ -100,12 +100,12 @@ export class GoogleOauthCallbackService {
       throw new UnauthorizedException(AUTH_MESSAGES.OAUTH_VALIDATION_FAILED);
     }
 
-    const { sub, email, name, picture } = claims;
+    const { providerUserId, email, name, picture } = claims;
 
     const sessionResult = await db.transaction(async (tx) => {
       const match = await this.oauthAccountsRepository.findUserByProvider(
         'google',
-        sub,
+        providerUserId,
         tx,
       );
 
@@ -134,7 +134,7 @@ export class GoogleOauthCallbackService {
             {
               userId: user.id,
               provider: 'google',
-              providerUserId: sub,
+              providerUserId,
             },
             tx,
           );
@@ -176,7 +176,7 @@ export class GoogleOauthCallbackService {
             {
               userId: user.id,
               provider: 'google',
-              providerUserId: sub,
+              providerUserId,
             },
             tx,
           );
@@ -185,7 +185,7 @@ export class GoogleOauthCallbackService {
         const finalMatch =
           await this.oauthAccountsRepository.findUserByProvider(
             'google',
-            sub,
+            providerUserId,
             tx,
           );
         if (!finalMatch) {
@@ -231,7 +231,7 @@ export class GoogleOauthCallbackService {
       );
     }
 
-    const { sub, email, name, picture } = claims;
+    const { providerUserId, email, name, picture } = claims;
 
     try {
       await db.transaction(async (tx) => {
@@ -253,7 +253,7 @@ export class GoogleOauthCallbackService {
 
         const match = await this.oauthAccountsRepository.findUserByProvider(
           'google',
-          sub,
+          providerUserId,
           tx,
         );
 
@@ -270,7 +270,7 @@ export class GoogleOauthCallbackService {
           {
             userId: linkingUserId,
             provider: 'google',
-            providerUserId: sub,
+            providerUserId,
           },
           tx,
         );

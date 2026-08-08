@@ -6,7 +6,6 @@ import {
   HttpCode,
   HttpStatus,
   Post,
-  Query,
   Req,
   Res,
   UseGuards,
@@ -22,40 +21,44 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { IdempotencyInterceptor } from '../common/interceptors/idempotency.interceptor';
 
-import { SignUpDto } from './dtos/sign-up.dto';
-import { SignInDto } from './dtos/sign-in.dto';
-import { ForgotPasswordDto } from './dtos/forgot-password.dto';
-import { ResetPasswordDto } from './dtos/reset-password.dto';
-import { VerifyEmailDto } from './dtos/verify-email.dto';
-import { ResendVerificationEmailDto } from './dtos/resend-verification-email.dto';
-import { RevokeSessionDto } from './dtos/revoke-session.dto';
-import { SessionsListResponseDto } from './dtos/session-response.dto';
+import {
+  SignUpDto,
+  SignInDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+  VerifyEmailDto,
+  ResendVerificationEmailDto,
+  RevokeSessionDto,
+  SessionsListResponseDto,
+  SetPasswordDto,
+  UnlinkOauthAccountDto,
+  ChangePasswordDto,
+} from './dtos';
 import type { Request, Response } from 'express';
 import { AuthGuard } from '../common/guards/auth.guard';
 import { User } from 'src/common/decorators/user.decorator';
 import type { AuthUser } from 'src/common/types/auth-user.type';
-import { SignUpService } from './services/sign-up.service';
-import { SignInService } from './services/sign-in.service';
-import { VerifyEmailService } from './services/verify-email.service';
-import { LogoutService } from './services/logout.service';
-import { ListSessionsService } from './services/list-sessions.service';
-import { RevokeSessionService } from './services/revoke-session.service';
-import { RevokeAllOtherSessionsService } from './services/revoke-all-other-sessions.service';
-import { ForgotPasswordService } from './services/forgot-password.service';
-import { ResetPasswordService } from './services/reset-password.service';
-import { ChangePasswordDto } from './dtos/change-password.dto';
-import { ChangePasswordService } from './services/change-password.service';
-import { RefreshService } from './services/refresh.service';
-import { ResendVerificationEmailService } from './services/resend-verification-email.service';
-import { GoogleOauthLoginService } from './services/google-oauth-login.service';
-import { GoogleOauthCallbackService } from './services/google-oauth-callback.service';
-import { ConfigService } from '@nestjs/config';
 import { AUTH_MESSAGES } from 'src/common/constants/messages.constant';
-import { SetPasswordDto } from './dtos/set-password.dto';
-import { SetPasswordService } from './services/set-password.service';
-import { ListOauthAccountsService } from './services/list-oauth-accounts.service';
-import { UnlinkOauthAccountService } from './services/unlink-oauth-account.service';
-import { UnlinkOauthAccountDto } from './dtos/unlink-oauth-account.dto';
+import { ConfigService } from '@nestjs/config';
+import {
+  SignUpService,
+  SignInService,
+  VerifyEmailService,
+  LogoutService,
+  ListSessionsService,
+  RevokeSessionService,
+  RevokeAllOtherSessionsService,
+  ForgotPasswordService,
+  ResetPasswordService,
+  RefreshService,
+  ChangePasswordService,
+  ResendVerificationEmailService,
+  GoogleOauthLoginService,
+  GoogleOauthCallbackService,
+  SetPasswordService,
+  ListOauthAccountsService,
+  UnlinkOauthAccountService,
+} from './services';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -98,19 +101,6 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     return this.signInService.signIn(signInDto, res, req);
-  }
-
-  @Get('verify-email')
-  @ApiOperation({ summary: 'Redirect verification token link to frontend UI' })
-  verifyEmailRedirect(@Query('token') token: string, @Res() res: Response) {
-    const frontendUrl =
-      this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
-    if (token) {
-      return res.redirect(
-        `${frontendUrl}/verify?token=${encodeURIComponent(token)}`,
-      );
-    }
-    return res.redirect(`${frontendUrl}/verify`);
   }
 
   @Post('verify-email')

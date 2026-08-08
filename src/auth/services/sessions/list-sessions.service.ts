@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import type { RefreshSession } from 'src/db/schema';
 import { TokensService } from 'src/tokens/tokens.service';
 import { RefreshSessionsRepository } from 'src/users/repositories/refresh-sessions.repository';
-import type { SessionResponseDto } from '../dtos/session-response.dto';
-import { parseUserAgent } from '../utils/user-agent.util';
+import type { SessionResponseDto } from '../../dtos/session-response.dto';
+import { parseUserAgent } from '../../utils/user-agent.util';
 
 @Injectable()
 export class ListSessionsService {

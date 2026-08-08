@@ -5,8 +5,8 @@ import { UserWithRole, type EmailVerificationToken } from 'src/db/schema';
 import { HashingService } from 'src/hashing/hashing.service';
 import { UsersRepository } from 'src/users/repositories/users.repository';
 import { AuthTokensRepository } from 'src/users/repositories/auth-tokens.repository';
-import { SignUpDto } from '../dtos/sign-up.dto';
-import { ResendVerificationEmailService } from './resend-verification-email.service';
+import { ResendVerificationEmailService } from '../verification/resend-verification-email.service';
+import { SignUpDto } from '../../dtos/sign-up.dto';
 
 @Injectable()
 export class SignUpService {

@@ -1,16 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AUTH_CONFIG } from 'src/common/constants/auth.constant';
 import { AUTH_MESSAGES } from 'src/common/constants/messages.constant';
 import { EmailService } from 'src/email/email.service';
 import { PasswordResetEmail } from 'src/email/templates/password-reset.email';
 import { AuthTokensRepository } from 'src/users/repositories/auth-tokens.repository';
-import { ForgotPasswordDto } from '../dtos/forgot-password.dto';
-import { formatToken, generateRandomToken } from '../utils/token.util';
+import { ForgotPasswordDto } from '../../dtos/forgot-password.dto';
+import { formatToken, generateRandomToken } from '../../utils/token.util';
 import { hashSha256 } from 'src/common/utils/sha256.util';
 
 @Injectable()
 export class ForgotPasswordService {
+  private readonly logger = new Logger(ForgotPasswordService.name);
+
   constructor(
     private readonly authTokensRepository: AuthTokensRepository,
     private readonly emailService: EmailService,
@@ -76,6 +78,11 @@ export class ForgotPasswordService {
       name,
       `${frontendUrl}/reset-password?token=${encodeURIComponent(resetToken)}`,
     );
-    void this.emailService.send(passwordResetEmail).catch(() => undefined);
+    void this.emailService.send(passwordResetEmail).catch((error) => {
+      this.logger.error(
+        `Failed to send password reset email to ${email}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    });
   }
 }

@@ -5,7 +5,7 @@ import { VALIDATION_MESSAGES } from 'src/common/constants/messages.constant';
 
 export class ResetPasswordDto {
   @ApiProperty({
-    example: 'a1b2c3d4e5f6...',
+    example: SWAGGER_EXAMPLES.token,
     required: true,
   })
   @IsString()

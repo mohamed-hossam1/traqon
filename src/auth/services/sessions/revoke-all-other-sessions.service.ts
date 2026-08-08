@@ -35,11 +35,13 @@ export class RevokeAllOtherSessionsService {
       throw new UnauthorizedException(AUTH_MESSAGES.INVALID_REFRESH_TOKEN);
     }
 
-    if (!payload.sid || payload.sub !== userId) {
+    if (!payload.sessionId || payload.userId !== userId) {
       throw new UnauthorizedException(AUTH_MESSAGES.INVALID_REFRESH_TOKEN);
     }
 
-    const session = await this.refreshSessionsRepository.findById(payload.sid);
+    const session = await this.refreshSessionsRepository.findById(
+      payload.sessionId,
+    );
 
     if (
       !session ||
@@ -55,10 +57,11 @@ export class RevokeAllOtherSessionsService {
       await this.refreshSessionsRepository.update(session.id, {
         revokedAt: new Date(),
       });
+      await this.tokensService.blacklistSession(session.id);
       throw new UnauthorizedException(AUTH_MESSAGES.INVALID_REFRESH_TOKEN);
     }
 
-    await this.refreshSessionsRepository.revokeAllExcept(userId, payload.sid);
+    await this.tokensService.revokeAllOtherSessions(userId, payload.sessionId);
 
     return { message: AUTH_MESSAGES.SESSIONS_REVOKED_OTHERS_SUCCESS };
   }

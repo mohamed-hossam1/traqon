@@ -9,7 +9,7 @@ import { db } from 'src/db';
 import { HashingService } from 'src/hashing/hashing.service';
 import { UsersRepository } from 'src/users/repositories/users.repository';
 import { RefreshSessionsRepository } from 'src/users/repositories/refresh-sessions.repository';
-import { ChangePasswordDto } from '../dtos/change-password.dto';
+import { ChangePasswordDto } from '../../dtos/change-password.dto';
 import { AuthUser } from 'src/common/types/auth-user.type';
 import { TokensService } from 'src/tokens/tokens.service';
 
@@ -58,23 +58,22 @@ export class ChangePasswordService {
 
     await db.transaction(async (tx) => {
       await this.usersRepository.update(existingUser.id, { passwordHash }, tx);
-
-      if (changePasswordDto.revokeOtherSessions) {
-        const currentSessionId =
-          await this.tokensService.getSessionIdFromRefreshToken(
-            refreshToken,
-            existingUser.id,
-          );
-
-        if (currentSessionId) {
-          await this.refreshSessionsRepository.revokeAllExcept(
-            existingUser.id,
-            currentSessionId,
-            tx,
-          );
-        }
-      }
     });
+
+    if (changePasswordDto.revokeOtherSessions) {
+      const currentSessionId =
+        await this.tokensService.getSessionIdFromRefreshToken(
+          refreshToken,
+          existingUser.id,
+        );
+
+      if (currentSessionId) {
+        await this.tokensService.revokeAllOtherSessions(
+          existingUser.id,
+          currentSessionId,
+        );
+      }
+    }
 
     return { message: AUTH_MESSAGES.CHANGE_PASSWORD_SUCCESS };
   }

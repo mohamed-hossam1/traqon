@@ -1,8 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Response } from 'express';
 import { AUTH_MESSAGES } from 'src/common/constants/messages.constant';
-import { TokensService } from 'src/tokens/tokens.service';
 import { RefreshSessionsRepository } from 'src/users/repositories/refresh-sessions.repository';
+import { TokensService } from 'src/tokens/tokens.service';
 
 @Injectable()
 export class RevokeSessionService {
@@ -25,6 +25,8 @@ export class RevokeSessionService {
     if (!session) {
       throw new NotFoundException(AUTH_MESSAGES.SESSION_NOT_FOUND);
     }
+
+    await this.tokensService.blacklistSession(session.id);
 
     const currentSessionId =
       await this.tokensService.getSessionIdFromRefreshToken(
