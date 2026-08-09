@@ -4,6 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { setupSwagger } from './swagger-setup';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { AppModule } from './app.module';
 
@@ -13,7 +14,10 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
 
+  app.use(helmet());
   app.use(cookieParser());
+
+  app.enableShutdownHooks();
 
   app.setGlobalPrefix('api');
 
@@ -37,6 +41,14 @@ async function bootstrap() {
   }
 
   const port = configService.get<number>('PORT') ?? 5000;
+
+  process.on('unhandledRejection', (reason, promise) => {
+    logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  });
+
+  process.on('uncaughtException', (error) => {
+    logger.error('Uncaught Exception:', error);
+  });
 
   await app.listen(port);
 
