@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 import { Email } from './interfaces/email.interface';
 
 @Injectable()
 export class EmailService {
+  private readonly logger = new Logger(EmailService.name);
   private readonly resend: Resend | null = null;
   private readonly defaultFrom: string;
 
@@ -19,6 +20,9 @@ export class EmailService {
 
   async send(email: Email): Promise<boolean> {
     if (!this.resend) {
+      this.logger.warn(
+        `RESEND_API_KEY not configured. Skipped sending email to ${email.to}`,
+      );
       return false;
     }
 
@@ -31,11 +35,18 @@ export class EmailService {
       });
 
       if (response?.error) {
+        this.logger.error(
+          `Failed to send email to ${email.to}: ${JSON.stringify(response.error)}`,
+        );
         return false;
       }
 
       return true;
-    } catch {
+    } catch (error) {
+      this.logger.error(
+        `Unexpected error sending email to ${email.to}`,
+        error instanceof Error ? error.stack : String(error),
+      );
       return false;
     }
   }

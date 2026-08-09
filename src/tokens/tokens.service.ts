@@ -8,22 +8,10 @@ import { UserWithRole, type UserRole } from 'src/db/schema';
 import { hashSha256 } from 'src/common/utils/sha256.util';
 import { UsersRepository } from 'src/users/repositories/users.repository';
 import { RefreshSessionsRepository } from 'src/users/repositories/refresh-sessions.repository';
+import { RedisService } from 'src/common/redis/redis.service';
+import { JwtPayload, RefreshJwtPayload, SessionMeta } from 'src/common/types';
 
-export type JwtPayload = {
-  sub: string;
-  email: string;
-  name: string | null;
-  role: UserRole;
-};
-
-export type RefreshJwtPayload = JwtPayload & {
-  sid: string;
-};
-
-export type SessionMeta = {
-  userAgent?: string | null;
-  ipAddress?: string | null;
-};
+export type { JwtPayload, RefreshJwtPayload, SessionMeta };
 
 @Injectable()
 export class TokensService {
@@ -32,7 +20,34 @@ export class TokensService {
     private readonly configService: ConfigService,
     private readonly usersRepository: UsersRepository,
     private readonly refreshSessionsRepository: RefreshSessionsRepository,
+    private readonly redisService: RedisService,
   ) {}
+
+  getAccessTokenTtlSeconds(): number {
+    const raw =
+      this.configService.get<string>('JWT_ACCESS_EXPIRES_IN') ?? '15m';
+    const match = /^(\d+)([smhd])$/.exec(raw.trim());
+
+    if (!match) {
+      return 15 * 60;
+    }
+
+    const value = Number(match[1]);
+    const unit = match[2];
+
+    switch (unit) {
+      case 's':
+        return value;
+      case 'm':
+        return value * 60;
+      case 'h':
+        return value * 3600;
+      case 'd':
+        return value * 86400;
+      default:
+        return 15 * 60;
+    }
+  }
 
   getRefreshTokenTtlMs(): number {
     const raw =
@@ -60,17 +75,24 @@ export class TokensService {
     }
   }
 
-  private buildAccessPayload(user: UserWithRole): JwtPayload {
+  private buildAccessPayload(
+    user: UserWithRole,
+    sessionId?: string,
+  ): JwtPayload {
     return {
-      sub: user.id,
+      userId: user.id,
       email: user.email,
       name: user.name,
       role: user.role,
+      ...(sessionId ? { sessionId } : {}),
     };
   }
 
-  async generateAccessToken(user: UserWithRole): Promise<string> {
-    return this.jwtService.signAsync(this.buildAccessPayload(user), {
+  async generateAccessToken(
+    user: UserWithRole,
+    sessionId?: string,
+  ): Promise<string> {
+    return this.jwtService.signAsync(this.buildAccessPayload(user, sessionId), {
       secret: this.configService.get('JWT_ACCESS_SECRET'),
       expiresIn: this.configService.get('JWT_ACCESS_EXPIRES_IN'),
     });
@@ -81,8 +103,8 @@ export class TokensService {
     sessionId: string,
   ): Promise<string> {
     const payload: RefreshJwtPayload = {
-      ...this.buildAccessPayload(user),
-      sid: sessionId,
+      ...this.buildAccessPayload(user, sessionId),
+      sessionId,
     };
 
     return this.jwtService.signAsync(payload, {
@@ -91,11 +113,40 @@ export class TokensService {
     });
   }
 
+  async blacklistSession(sessionId: string): Promise<void> {
+    if (!sessionId) return;
+    const ttl = this.getAccessTokenTtlSeconds();
+    await this.redisService.set(
+      `blacklist:session:${sessionId}`,
+      'revoked',
+      ttl,
+    );
+  }
+
+  async blacklistSessions(sessionIds: string[]): Promise<void> {
+    const validIds = sessionIds.filter(Boolean);
+    if (validIds.length === 0) return;
+    const ttl = this.getAccessTokenTtlSeconds();
+    await Promise.all(
+      validIds.map((id) =>
+        this.redisService.set(`blacklist:session:${id}`, 'revoked', ttl),
+      ),
+    );
+  }
+
+  async isSessionBlacklisted(sessionId: string | undefined): Promise<boolean> {
+    if (!sessionId) return false;
+    const result = await this.redisService.get(
+      `blacklist:session:${sessionId}`,
+    );
+    return result === 'revoked';
+  }
+
   setRefreshTokenToCookie(res: Response, refreshToken: string) {
     res.cookie('refresh_token', refreshToken, {
       httpOnly: true,
       secure: this.configService.get('NODE_ENV') === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: this.getRefreshTokenTtlMs(),
     });
   }
@@ -104,7 +155,7 @@ export class TokensService {
     res.clearCookie('refresh_token', {
       httpOnly: true,
       secure: this.configService.get('NODE_ENV') === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
     });
   }
 
@@ -125,7 +176,7 @@ export class TokensService {
     const sessionId = randomUUID();
     const expiresAt = new Date(Date.now() + this.getRefreshTokenTtlMs());
     const refreshToken = await this.generateRefreshToken(user, sessionId);
-    const accessToken = await this.generateAccessToken(user);
+    const accessToken = await this.generateAccessToken(user, sessionId);
     const refreshTokenHash = hashSha256(refreshToken);
 
     const userAgent = meta.userAgent ?? null;
@@ -172,15 +223,15 @@ export class TokensService {
         },
       );
 
-      if (!payload.sid) {
+      if (!payload.sessionId) {
         return null;
       }
 
-      if (userId && payload.sub !== userId) {
+      if (userId && payload.userId !== userId) {
         return null;
       }
 
-      return payload.sid;
+      return payload.sessionId;
     } catch {
       return null;
     }
@@ -199,10 +250,36 @@ export class TokensService {
       await this.refreshSessionsRepository.update(sessionId, {
         revokedAt: new Date(),
       });
+      await this.blacklistSession(sessionId);
     }
   }
 
   async revokeAllSessions(userId: string): Promise<void> {
+    const activeSessions =
+      await this.refreshSessionsRepository.findActiveByUserId(userId);
     await this.refreshSessionsRepository.revokeAll(userId);
+    if (activeSessions && activeSessions.length > 0) {
+      await this.blacklistSessions(activeSessions.map((s) => s.id));
+    }
+  }
+
+  async revokeAllOtherSessions(
+    userId: string,
+    exceptSessionId: string,
+  ): Promise<void> {
+    const activeSessions =
+      await this.refreshSessionsRepository.findActiveByUserId(userId);
+    const otherSessionIds = (activeSessions || [])
+      .filter((s) => s.id !== exceptSessionId)
+      .map((s) => s.id);
+
+    await this.refreshSessionsRepository.revokeAllExcept(
+      userId,
+      exceptSessionId,
+    );
+
+    if (otherSessionIds.length > 0) {
+      await this.blacklistSessions(otherSessionIds);
+    }
   }
 }

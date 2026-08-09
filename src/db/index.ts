@@ -2,9 +2,13 @@ import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from './schema';
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
+const connectionString =
+  process.env.DATABASE_URL ||
+  'postgresql://postgres:postgrespassword@localhost:5433/traqon_db';
 
-export const db = drizzle(process.env.DATABASE_URL!, {
+const pool = new Pool({ connectionString });
+
+export const db = drizzle(connectionString, {
   schema,
 } as unknown as NonNullable<Parameters<typeof drizzle>[1]>);
 
