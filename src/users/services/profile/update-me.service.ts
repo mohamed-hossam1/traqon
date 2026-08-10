@@ -7,15 +7,11 @@ import { AUTH_MESSAGES } from 'src/common/constants/messages.constant';
 import type { AuthUser } from 'src/common/types/auth-user.type';
 import { UpdateUserDto } from '../../dtos/update-user.dto';
 import { UsersRepository } from '../../repositories/users.repository';
-import { UserProfileCacheService } from './user-profile-cache.service';
 import { toPublicUser } from '../../utils/users.mapper';
 
 @Injectable()
 export class UpdateMeService {
-  constructor(
-    private readonly usersRepository: UsersRepository,
-    private readonly userProfileCacheService: UserProfileCacheService,
-  ) {}
+  constructor(private readonly usersRepository: UsersRepository) {}
 
   async updateMe(currentUser: AuthUser, dto: UpdateUserDto) {
     if (dto.name === undefined && dto.avatarUrl === undefined) {
@@ -34,8 +30,6 @@ export class UpdateMeService {
     if (!updated) {
       throw new NotFoundException(AUTH_MESSAGES.USER_NOT_FOUND);
     }
-
-    await this.userProfileCacheService.invalidate(currentUser.id);
 
     return {
       message: AUTH_MESSAGES.USER_UPDATED_SUCCESS,

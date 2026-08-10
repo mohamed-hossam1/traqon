@@ -15,14 +15,10 @@ import { RedisThrottlerStorageService } from './common/throttler/redis-throttler
 import { CustomThrottlerGuard } from './common/guards/custom-throttler.guard';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
-import { AppCacheModule } from './common/cache/cache.module';
-import { RedisCacheInterceptor } from './common/cache/interceptors/redis-cache.interceptor';
-
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     RedisModule,
-    AppCacheModule,
     ThrottlerModule.forRootAsync({
       imports: [RedisModule],
       inject: [RedisService],
@@ -53,10 +49,6 @@ import { RedisCacheInterceptor } from './common/cache/interceptors/redis-cache.i
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,
-    },
-    {
-      provide: APP_INTERCEPTOR,
-      useClass: RedisCacheInterceptor,
     },
   ],
 })

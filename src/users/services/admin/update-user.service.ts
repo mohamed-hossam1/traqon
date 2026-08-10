@@ -7,14 +7,10 @@ import { AUTH_MESSAGES } from 'src/common/constants/messages.constant';
 import { UpdateUserDto } from '../../dtos/update-user.dto';
 import { UsersRepository } from '../../repositories/users.repository';
 import { toPublicUser } from '../../utils/users.mapper';
-import { UserProfileCacheService } from '../profile/user-profile-cache.service';
 
 @Injectable()
 export class UpdateUserService {
-  constructor(
-    private readonly usersRepository: UsersRepository,
-    private readonly userProfileCacheService: UserProfileCacheService,
-  ) {}
+  constructor(private readonly usersRepository: UsersRepository) {}
 
   async update(targetUserId: string, dto: UpdateUserDto) {
     if (dto.name === undefined && dto.avatarUrl === undefined) {
@@ -33,8 +29,6 @@ export class UpdateUserService {
     if (!updated) {
       throw new NotFoundException(AUTH_MESSAGES.USER_NOT_FOUND);
     }
-
-    await this.userProfileCacheService.invalidate(targetUserId);
 
     const ban = updated.isBanned
       ? await this.usersRepository.findBanByUserId(updated.id)
