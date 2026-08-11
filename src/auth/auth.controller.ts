@@ -244,13 +244,8 @@ export class AuthController {
   changePassword(
     @User() user: AuthUser,
     @Body() changePasswordDto: ChangePasswordDto,
-    @Req() req: Request,
   ) {
-    return this.changePasswordService.changePassword(
-      user,
-      changePasswordDto,
-      req.cookies?.refresh_token,
-    );
+    return this.changePasswordService.changePassword(user, changePasswordDto);
   }
 
   @Post('set-password')
@@ -259,16 +254,8 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiCookieAuth('refresh_token')
   @ApiOperation({ summary: 'Set password for an account without one' })
-  setPassword(
-    @User() user: AuthUser,
-    @Body() setPasswordDto: SetPasswordDto,
-    @Req() req: Request,
-  ) {
-    return this.setPasswordService.setPassword(
-      user,
-      setPasswordDto,
-      req.cookies?.refresh_token,
-    );
+  setPassword(@User() user: AuthUser, @Body() setPasswordDto: SetPasswordDto) {
+    return this.setPasswordService.setPassword(user, setPasswordDto);
   }
 
   @Get('google')

@@ -67,7 +67,6 @@ export class RefreshService {
       await this.refreshSessionsRepository.update(session.id, {
         revokedAt: new Date(),
       });
-      await this.tokensService.blacklistSession(session.id);
       this.tokensService.clearRefreshTokenCookie(res);
       throw new UnauthorizedException(AUTH_MESSAGES.INVALID_REFRESH_TOKEN);
     }
@@ -78,7 +77,6 @@ export class RefreshService {
     }
 
     if (user.isBanned) {
-      await this.tokensService.revokeAllSessions(user.id);
       this.tokensService.clearRefreshTokenCookie(res);
       const ban = await this.usersRepository.findBanByUserId(user.id);
       assertUserNotBanned({
@@ -101,10 +99,12 @@ export class RefreshService {
       const newRefreshToken = await this.tokensService.generateRefreshToken(
         user,
         session.id,
+        user.authzVersion,
       );
       const accessToken = await this.tokensService.generateAccessToken(
         user,
         session.id,
+        user.authzVersion,
       );
       const tokenHash = hashSha256(newRefreshToken);
 

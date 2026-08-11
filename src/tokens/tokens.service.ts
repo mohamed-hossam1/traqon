@@ -8,7 +8,6 @@ import { UserWithRole, type UserRole } from 'src/db/schema';
 import { hashSha256 } from 'src/common/utils/sha256.util';
 import { UsersRepository } from 'src/users/repositories/users.repository';
 import { RefreshSessionsRepository } from 'src/users/repositories/refresh-sessions.repository';
-import { RedisService } from 'src/common/redis/redis.service';
 import { JwtPayload, RefreshJwtPayload, SessionMeta } from 'src/common/types';
 
 export type { JwtPayload, RefreshJwtPayload, SessionMeta };
@@ -20,7 +19,6 @@ export class TokensService {
     private readonly configService: ConfigService,
     private readonly usersRepository: UsersRepository,
     private readonly refreshSessionsRepository: RefreshSessionsRepository,
-    private readonly redisService: RedisService,
   ) {}
 
   getAccessTokenTtlSeconds(): number {
@@ -77,69 +75,46 @@ export class TokensService {
 
   private buildAccessPayload(
     user: UserWithRole,
-    sessionId?: string,
+    sessionId: string,
+    authzVersion?: number,
   ): JwtPayload {
     return {
       userId: user.id,
-      email: user.email,
-      name: user.name,
       role: user.role,
-      ...(sessionId ? { sessionId } : {}),
+      av: authzVersion ?? user.authzVersion ?? 0,
+      sessionId,
     };
   }
 
   async generateAccessToken(
     user: UserWithRole,
-    sessionId?: string,
+    sessionId: string,
+    authzVersion?: number,
   ): Promise<string> {
-    return this.jwtService.signAsync(this.buildAccessPayload(user, sessionId), {
-      secret: this.configService.get('JWT_ACCESS_SECRET'),
-      expiresIn: this.configService.get('JWT_ACCESS_EXPIRES_IN'),
-    });
+    return this.jwtService.signAsync(
+      this.buildAccessPayload(user, sessionId, authzVersion),
+      {
+        secret: this.configService.get('JWT_ACCESS_SECRET'),
+        expiresIn: this.configService.get('JWT_ACCESS_EXPIRES_IN'),
+      },
+    );
   }
 
   async generateRefreshToken(
     user: UserWithRole,
     sessionId: string,
+    authzVersion?: number,
   ): Promise<string> {
-    const payload: RefreshJwtPayload = {
-      ...this.buildAccessPayload(user, sessionId),
+    const payload: RefreshJwtPayload = this.buildAccessPayload(
+      user,
       sessionId,
-    };
+      authzVersion,
+    );
 
     return this.jwtService.signAsync(payload, {
       secret: this.configService.get('JWT_REFRESH_SECRET'),
       expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN'),
     });
-  }
-
-  async blacklistSession(sessionId: string): Promise<void> {
-    if (!sessionId) return;
-    const ttl = this.getAccessTokenTtlSeconds();
-    await this.redisService.set(
-      `blacklist:session:${sessionId}`,
-      'revoked',
-      ttl,
-    );
-  }
-
-  async blacklistSessions(sessionIds: string[]): Promise<void> {
-    const validIds = sessionIds.filter(Boolean);
-    if (validIds.length === 0) return;
-    const ttl = this.getAccessTokenTtlSeconds();
-    await Promise.all(
-      validIds.map((id) =>
-        this.redisService.set(`blacklist:session:${id}`, 'revoked', ttl),
-      ),
-    );
-  }
-
-  async isSessionBlacklisted(sessionId: string | undefined): Promise<boolean> {
-    if (!sessionId) return false;
-    const result = await this.redisService.get(
-      `blacklist:session:${sessionId}`,
-    );
-    return result === 'revoked';
   }
 
   setRefreshTokenToCookie(res: Response, refreshToken: string) {
@@ -164,6 +139,7 @@ export class TokensService {
     res: Response,
     message: string,
     meta: SessionMeta = {},
+    authzVersion?: number,
   ) {
     if (user.isBanned) {
       const ban = await this.usersRepository.findBanByUserId(user.id);
@@ -175,8 +151,17 @@ export class TokensService {
 
     const sessionId = randomUUID();
     const expiresAt = new Date(Date.now() + this.getRefreshTokenTtlMs());
-    const refreshToken = await this.generateRefreshToken(user, sessionId);
-    const accessToken = await this.generateAccessToken(user, sessionId);
+    const versionToUse = authzVersion ?? user.authzVersion ?? 0;
+    const refreshToken = await this.generateRefreshToken(
+      user,
+      sessionId,
+      versionToUse,
+    );
+    const accessToken = await this.generateAccessToken(
+      user,
+      sessionId,
+      versionToUse,
+    );
     const refreshTokenHash = hashSha256(refreshToken);
 
     const userAgent = meta.userAgent ?? null;
@@ -250,36 +235,20 @@ export class TokensService {
       await this.refreshSessionsRepository.update(sessionId, {
         revokedAt: new Date(),
       });
-      await this.blacklistSession(sessionId);
     }
   }
 
   async revokeAllSessions(userId: string): Promise<void> {
-    const activeSessions =
-      await this.refreshSessionsRepository.findActiveByUserId(userId);
     await this.refreshSessionsRepository.revokeAll(userId);
-    if (activeSessions && activeSessions.length > 0) {
-      await this.blacklistSessions(activeSessions.map((s) => s.id));
-    }
   }
 
   async revokeAllOtherSessions(
     userId: string,
     exceptSessionId: string,
   ): Promise<void> {
-    const activeSessions =
-      await this.refreshSessionsRepository.findActiveByUserId(userId);
-    const otherSessionIds = (activeSessions || [])
-      .filter((s) => s.id !== exceptSessionId)
-      .map((s) => s.id);
-
     await this.refreshSessionsRepository.revokeAllExcept(
       userId,
       exceptSessionId,
     );
-
-    if (otherSessionIds.length > 0) {
-      await this.blacklistSessions(otherSessionIds);
-    }
   }
 }

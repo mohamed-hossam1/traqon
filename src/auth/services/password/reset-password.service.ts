@@ -8,8 +8,7 @@ import { RefreshSessionsRepository } from 'src/users/repositories/refresh-sessio
 import { ResetPasswordDto } from '../../dtos/reset-password.dto';
 import { parseToken } from '../../utils/token.util';
 import { compareSha256 } from 'src/common/utils/sha256.util';
-
-import { TokensService } from 'src/tokens/tokens.service';
+import { AuthzVersionService } from 'src/common/redis/authz-version.service';
 
 @Injectable()
 export class ResetPasswordService {
@@ -18,7 +17,7 @@ export class ResetPasswordService {
     private readonly authTokensRepository: AuthTokensRepository,
     private readonly refreshSessionsRepository: RefreshSessionsRepository,
     private readonly hashingService: HashingService,
-    private readonly tokensService: TokensService,
+    private readonly authzVersionService: AuthzVersionService,
   ) {}
 
   async resetPassword(resetPasswordDto: ResetPasswordDto) {
@@ -49,12 +48,18 @@ export class ResetPasswordService {
       resetPasswordDto.password,
     );
 
-    await db.transaction(async (tx) => {
+    const newVersion = await db.transaction(async (tx) => {
       await this.usersRepository.update(user.id, { passwordHash }, tx);
       await this.authTokensRepository.deletePasswordResetToken(user.id, tx);
+      const newVersion = await this.usersRepository.incrementAuthzVersion(
+        user.id,
+        tx,
+      );
+      await this.refreshSessionsRepository.revokeAll(user.id, tx);
+      return newVersion;
     });
 
-    await this.tokensService.revokeAllSessions(user.id);
+    await this.authzVersionService.setVersion(user.id, newVersion);
 
     return { message: AUTH_MESSAGES.RESET_PASSWORD_SUCCESS };
   }

@@ -11,7 +11,7 @@ import { UsersRepository } from 'src/users/repositories/users.repository';
 import { RefreshSessionsRepository } from 'src/users/repositories/refresh-sessions.repository';
 import { ChangePasswordDto } from '../../dtos/change-password.dto';
 import { AuthUser } from 'src/common/types/auth-user.type';
-import { TokensService } from 'src/tokens/tokens.service';
+import { AuthzVersionService } from 'src/common/redis/authz-version.service';
 
 @Injectable()
 export class ChangePasswordService {
@@ -19,14 +19,10 @@ export class ChangePasswordService {
     private readonly usersRepository: UsersRepository,
     private readonly refreshSessionsRepository: RefreshSessionsRepository,
     private readonly hashingService: HashingService,
-    private readonly tokensService: TokensService,
+    private readonly authzVersionService: AuthzVersionService,
   ) {}
 
-  async changePassword(
-    user: AuthUser,
-    changePasswordDto: ChangePasswordDto,
-    refreshToken?: string,
-  ) {
+  async changePassword(user: AuthUser, changePasswordDto: ChangePasswordDto) {
     if (changePasswordDto.oldPassword === changePasswordDto.newPassword) {
       throw new ConflictException(
         AUTH_MESSAGES.CURRENT_PASSWORD_AND_NEW_PASSWORD_ARE_THE_SAME,
@@ -56,24 +52,27 @@ export class ChangePasswordService {
       changePasswordDto.newPassword,
     );
 
-    await db.transaction(async (tx) => {
+    const currentSessionId = user.sessionId;
+
+    const newVersion = await db.transaction(async (tx) => {
       await this.usersRepository.update(existingUser.id, { passwordHash }, tx);
-    });
+      const newVersion = await this.usersRepository.incrementAuthzVersion(
+        existingUser.id,
+        tx,
+      );
 
-    if (changePasswordDto.revokeOtherSessions) {
-      const currentSessionId =
-        await this.tokensService.getSessionIdFromRefreshToken(
-          refreshToken,
-          existingUser.id,
-        );
-
-      if (currentSessionId) {
-        await this.tokensService.revokeAllOtherSessions(
+      if (changePasswordDto.revokeOtherSessions) {
+        await this.refreshSessionsRepository.revokeAllExcept(
           existingUser.id,
           currentSessionId,
+          tx,
         );
       }
-    }
+
+      return newVersion;
+    });
+
+    await this.authzVersionService.setVersion(existingUser.id, newVersion);
 
     return { message: AUTH_MESSAGES.CHANGE_PASSWORD_SUCCESS };
   }

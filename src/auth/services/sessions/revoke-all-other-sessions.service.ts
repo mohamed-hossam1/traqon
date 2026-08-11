@@ -2,15 +2,19 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { AUTH_MESSAGES } from 'src/common/constants/messages.constant';
-import { TokensService, RefreshJwtPayload } from 'src/tokens/tokens.service';
+import { RefreshJwtPayload } from 'src/tokens/tokens.service';
 import { RefreshSessionsRepository } from 'src/users/repositories/refresh-sessions.repository';
+import { UsersRepository } from 'src/users/repositories/users.repository';
+import { AuthzVersionService } from 'src/common/redis/authz-version.service';
 import { compareSha256 } from 'src/common/utils/sha256.util';
+import { db } from 'src/db';
 
 @Injectable()
 export class RevokeAllOtherSessionsService {
   constructor(
     private readonly refreshSessionsRepository: RefreshSessionsRepository,
-    private readonly tokensService: TokensService,
+    private readonly usersRepository: UsersRepository,
+    private readonly authzVersionService: AuthzVersionService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) {}
@@ -57,11 +61,21 @@ export class RevokeAllOtherSessionsService {
       await this.refreshSessionsRepository.update(session.id, {
         revokedAt: new Date(),
       });
-      await this.tokensService.blacklistSession(session.id);
       throw new UnauthorizedException(AUTH_MESSAGES.INVALID_REFRESH_TOKEN);
     }
 
-    await this.tokensService.revokeAllOtherSessions(userId, payload.sessionId);
+    const currentSessionId = payload.sessionId;
+
+    const newVersion = await db.transaction(async (tx) => {
+      await this.refreshSessionsRepository.revokeAllExcept(
+        userId,
+        currentSessionId,
+        tx,
+      );
+      return this.usersRepository.incrementAuthzVersion(userId, tx);
+    });
+
+    await this.authzVersionService.setVersion(userId, newVersion);
 
     return { message: AUTH_MESSAGES.SESSIONS_REVOKED_OTHERS_SUCCESS };
   }

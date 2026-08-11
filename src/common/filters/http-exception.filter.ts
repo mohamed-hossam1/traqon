@@ -33,6 +33,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
         : ((exceptionResponse as Record<string, unknown>).message ??
           exceptionResponse);
 
+    const code =
+      typeof exceptionResponse === 'object' && exceptionResponse !== null
+        ? (((exceptionResponse as Record<string, unknown>).code as
+            string | undefined) ?? null)
+        : null;
+
     const logMessage = `${request.method} ${request.url} [Status ${status}] - ${JSON.stringify(message)}`;
     if (status >= 500) {
       this.logger.error(
@@ -43,11 +49,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
       this.logger.warn(logMessage);
     }
 
-    response.status(status).json({
+    const responsePayload: Record<string, unknown> = {
       statusCode: status,
       message,
+      ...(code ? { code } : {}),
       timestamp: new Date().toISOString(),
       path: request.url,
-    });
+    };
+
+    response.status(status).json(responsePayload);
   }
 }
