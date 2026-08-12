@@ -5,37 +5,39 @@ import { TokensModule } from 'src/tokens/tokens.module';
 import { UsersRepositoriesModule } from './users-repositories.module';
 import { UsersController } from './users.controller';
 import {
-  UserProfileCacheService,
   DeleteUserService,
   DeleteMeService,
   UpdateUserService,
   UpdateMeService,
   BanUserService,
   UnbanUserService,
+  ChangeRoleService,
   ListUsersService,
   GetUserService,
   AdminListUserSessionsService,
   AdminRevokeSessionService,
+  ListAuditLogsService,
 } from './services';
 
 @Module({
   imports: [UsersRepositoriesModule, TokensModule],
   controllers: [UsersController],
   providers: [
-    UserProfileCacheService,
     DeleteUserService,
     DeleteMeService,
     UpdateUserService,
     UpdateMeService,
     BanUserService,
     UnbanUserService,
+    ChangeRoleService,
     ListUsersService,
     GetUserService,
     AdminListUserSessionsService,
     AdminRevokeSessionService,
+    ListAuditLogsService,
     AuthGuard,
     RolesGuard,
   ],
-  exports: [UsersRepositoriesModule, UserProfileCacheService],
+  exports: [UsersRepositoriesModule],
 })
 export class UsersModule {}

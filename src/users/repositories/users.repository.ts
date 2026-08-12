@@ -8,6 +8,7 @@ import {
   asc,
   desc,
   isNull,
+  sql,
   type SQL,
 } from 'drizzle-orm';
 import { normalizeEmail } from 'src/common/utils/email.util';
@@ -50,6 +51,39 @@ export class UsersRepository {
     executor: DbExecutor = db,
   ): Promise<UserWithRole | null> {
     return this.selectUser(executor, eq(users.id, id));
+  }
+
+  async getAuthzVersion(
+    id: string,
+    executor: DbExecutor = db,
+  ): Promise<number | null> {
+    const [row] = await executor
+      .select({ authzVersion: users.authzVersion })
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
+
+    return row ? row.authzVersion : null;
+  }
+
+  async incrementAuthzVersion(
+    id: string,
+    executor: DbExecutor = db,
+  ): Promise<number> {
+    const [updated] = await executor
+      .update(users)
+      .set({
+        authzVersion: sql`${users.authzVersion} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, id))
+      .returning({ authzVersion: users.authzVersion });
+
+    if (!updated) {
+      throw new Error(`User with ID ${id} not found for version increment`);
+    }
+
+    return updated.authzVersion;
   }
 
   async findAll(): Promise<UserWithRole[]> {

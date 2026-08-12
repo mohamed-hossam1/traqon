@@ -5,7 +5,8 @@ import {
 } from '@nestjs/common';
 import { ADMIN_MESSAGES } from 'src/common/constants/messages.constant';
 import type { AuthUser } from 'src/common/types/auth-user.type';
-import { TokensService } from 'src/tokens/tokens.service';
+import { UsersRepository } from 'src/users/repositories/users.repository';
+import { AuthzVersionService } from 'src/common/redis/authz-version.service';
 import { db } from 'src/db';
 import { RefreshSessionsRepository } from '../../repositories/refresh-sessions.repository';
 import { AdminAuditLogRepository } from '../../repositories/admin-audit-log.repository';
@@ -15,7 +16,8 @@ export class AdminRevokeSessionService {
   constructor(
     private readonly refreshSessionsRepository: RefreshSessionsRepository,
     private readonly adminAuditLogRepository: AdminAuditLogRepository,
-    private readonly tokensService: TokensService,
+    private readonly usersRepository: UsersRepository,
+    private readonly authzVersionService: AuthzVersionService,
   ) {}
 
   async revoke(currentUser: AuthUser, userId: string, sessionId: string) {
@@ -33,9 +35,14 @@ export class AdminRevokeSessionService {
       throw new BadRequestException(ADMIN_MESSAGES.SESSION_ALREADY_REVOKED);
     }
 
-    await db.transaction(async (tx) => {
+    const newVersion = await db.transaction(async (tx) => {
       await this.refreshSessionsRepository.revokeSessionForUser(
         sessionId,
+        userId,
+        tx,
+      );
+
+      const newVersion = await this.usersRepository.incrementAuthzVersion(
         userId,
         tx,
       );
@@ -43,16 +50,18 @@ export class AdminRevokeSessionService {
       await this.adminAuditLogRepository.create(
         {
           adminId: currentUser.id,
-          adminSessionId: currentUser.sessionId ?? null,
+          adminSessionId: currentUser.sessionId,
           action: 'revoke_session',
           targetUserId: userId,
           details: JSON.stringify({ sessionId }),
         },
         tx,
       );
+
+      return newVersion;
     });
 
-    await this.tokensService.blacklistSession(sessionId);
+    await this.authzVersionService.setVersion(userId, newVersion);
 
     return { message: ADMIN_MESSAGES.SESSION_REVOKED };
   }

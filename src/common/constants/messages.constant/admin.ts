@@ -7,4 +7,6 @@ export const ADMIN_MESSAGES = {
   CANNOT_BAN_SELF: 'You cannot ban yourself',
   CANNOT_REVOKE_OWN_SESSION:
     'You cannot revoke your own active session from the admin panel',
+  CANNOT_CHANGE_OWN_ROLE: 'You cannot change your own role',
+  ROLE_CHANGED_SUCCESS: 'User role updated successfully',
 } as const;

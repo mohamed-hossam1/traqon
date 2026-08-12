@@ -11,18 +11,18 @@ import type { AuthUser } from 'src/common/types/auth-user.type';
 import { db } from 'src/db';
 import { BanUserDto } from '../../dtos/ban-user.dto';
 import { UsersRepository } from '../../repositories/users.repository';
+import { RefreshSessionsRepository } from '../../repositories/refresh-sessions.repository';
 import { AdminAuditLogRepository } from '../../repositories/admin-audit-log.repository';
 import { toPublicUser } from '../../utils/users.mapper';
-import { CacheManagerService } from 'src/common/cache/services/cache-manager.service';
-import { TokensService } from 'src/tokens/tokens.service';
+import { AuthzVersionService } from 'src/common/redis/authz-version.service';
 
 @Injectable()
 export class BanUserService {
   constructor(
     private readonly usersRepository: UsersRepository,
+    private readonly refreshSessionsRepository: RefreshSessionsRepository,
     private readonly adminAuditLogRepository: AdminAuditLogRepository,
-    private readonly tokensService: TokensService,
-    private readonly cacheManager: CacheManagerService,
+    private readonly authzVersionService: AuthzVersionService,
   ) {}
 
   async ban(currentUser: AuthUser, targetUserId: string, dto: BanUserDto) {
@@ -36,29 +36,37 @@ export class BanUserService {
     }
 
     try {
-      const { user, ban, banHistory } = await db.transaction(async (tx) => {
-        const result = await this.usersRepository.banUser(
-          targetUserId,
-          banReason,
-          tx,
-        );
-
-        await this.adminAuditLogRepository.create(
-          {
-            adminId: currentUser.id,
-            adminSessionId: currentUser.sessionId ?? null,
-            action: 'ban_user',
+      const { user, ban, banHistory, newVersion } = await db.transaction(
+        async (tx) => {
+          const result = await this.usersRepository.banUser(
             targetUserId,
-            details: JSON.stringify({ banReason }),
-          },
-          tx,
-        );
+            banReason,
+            tx,
+          );
 
-        return result;
-      });
+          const newVersion = await this.usersRepository.incrementAuthzVersion(
+            targetUserId,
+            tx,
+          );
 
-      await this.tokensService.revokeAllSessions(targetUserId);
-      await this.cacheManager.invalidateUser(targetUserId);
+          await this.refreshSessionsRepository.revokeAll(targetUserId, tx);
+
+          await this.adminAuditLogRepository.create(
+            {
+              adminId: currentUser.id,
+              adminSessionId: currentUser.sessionId,
+              action: 'ban_user',
+              targetUserId,
+              details: JSON.stringify({ banReason }),
+            },
+            tx,
+          );
+
+          return { ...result, newVersion };
+        },
+      );
+
+      await this.authzVersionService.setVersion(targetUserId, newVersion);
 
       return {
         message: AUTH_MESSAGES.USER_BANNED_SUCCESS,

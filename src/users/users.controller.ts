@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -27,9 +28,13 @@ import { User } from 'src/common/decorators/user.decorator';
 import { AuthGuard } from 'src/common/guards/auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import type { AuthUser } from 'src/common/types/auth-user.type';
-import { BanUserDto, UpdateUserDto, ListUsersQueryDto } from './dtos';
-import { Cacheable } from 'src/common/cache/decorators/cacheable.decorator';
-import { InvalidateCache } from 'src/common/cache/decorators/invalidate-cache.decorator';
+import {
+  BanUserDto,
+  UpdateUserDto,
+  ListUsersQueryDto,
+  ChangeRoleDto,
+  ListAuditLogsQueryDto,
+} from './dtos';
 import { ROLES } from 'src/db/schema';
 import { UsersRepository } from './repositories/users.repository';
 import {
@@ -39,10 +44,12 @@ import {
   UpdateMeService,
   BanUserService,
   UnbanUserService,
+  ChangeRoleService,
   ListUsersService,
   GetUserService,
   AdminListUserSessionsService,
   AdminRevokeSessionService,
+  ListAuditLogsService,
 } from './services';
 
 @ApiTags('users')
@@ -55,10 +62,12 @@ export class UsersController {
     private readonly updateMeService: UpdateMeService,
     private readonly banUserService: BanUserService,
     private readonly unbanUserService: UnbanUserService,
+    private readonly changeRoleService: ChangeRoleService,
     private readonly listUsersService: ListUsersService,
     private readonly getUserService: GetUserService,
     private readonly adminListUserSessionsService: AdminListUserSessionsService,
     private readonly adminRevokeSessionService: AdminRevokeSessionService,
+    private readonly listAuditLogsService: ListAuditLogsService,
     private readonly usersRepository: UsersRepository,
   ) {}
 
@@ -86,24 +95,46 @@ export class UsersController {
     return this.listUsersService.list(query);
   }
 
+  @Get('audit-logs')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(ROLES.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'List admin audit logs (admin)',
+    description:
+      'Admin-only. Returns paginated list of admin audit logs with filters.',
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'action', required: false, type: String })
+  @ApiQuery({ name: 'adminId', required: false, type: String })
+  @ApiQuery({ name: 'targetUserId', required: false, type: String })
+  listAuditLogs(@Query() query: ListAuditLogsQueryDto) {
+    return this.listAuditLogsService.list(query);
+  }
+
   @Get('me')
   @UseGuards(AuthGuard)
-  @Cacheable({ scope: 'user', ttl: 300 })
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current authenticated user profile' })
   async me(@User() user: AuthUser) {
     const currentUser = await this.usersRepository.findById(user.id);
+    if (!currentUser) {
+      throw new NotFoundException('User not found');
+    }
     return {
       user: {
-        id: user.id,
+        id: currentUser.id,
         sessionId: user.sessionId,
-        email: user.email,
-        name: user.name,
-        avatarUrl: user.avatarUrl,
-        role: user.role,
-        isVerified: user.isVerified,
-        isBanned: user.isBanned,
-        hasPassword: Boolean(currentUser?.passwordHash),
+        email: currentUser.email,
+        name: currentUser.name,
+        avatarUrl: currentUser.avatarUrl,
+        role: currentUser.role,
+        isVerified: currentUser.isVerified,
+        isBanned: currentUser.isBanned,
+        createdAt: currentUser.createdAt,
+        updatedAt: currentUser.updatedAt,
+        hasPassword: Boolean(currentUser.passwordHash),
         ban: null,
       },
     };
@@ -112,10 +143,6 @@ export class UsersController {
   @Get(':id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(ROLES.ADMIN)
-  @Cacheable({
-    key: (req) => `cache:user:detail:${String(req.params.id)}`,
-    ttl: 300,
-  })
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Get user details (admin)',
@@ -176,7 +203,6 @@ export class UsersController {
   @Patch('me')
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard)
-  @InvalidateCache({ invalidateUser: true })
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Update current user profile',
@@ -191,7 +217,6 @@ export class UsersController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(ROLES.ADMIN)
-  @InvalidateCache({ invalidateUser: true })
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Update a user profile',
@@ -212,7 +237,6 @@ export class UsersController {
   @Delete('me')
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard)
-  @InvalidateCache({ invalidateUser: true })
   @ApiBearerAuth()
   @ApiCookieAuth('refresh_token')
   @ApiOperation({
@@ -228,7 +252,6 @@ export class UsersController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(ROLES.ADMIN)
-  @InvalidateCache({ invalidateUser: true })
   @ApiBearerAuth()
   @ApiCookieAuth('refresh_token')
   @ApiOperation({
@@ -248,9 +271,6 @@ export class UsersController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(ROLES.ADMIN)
-  @InvalidateCache({
-    keys: (req) => [`cache:user:detail:${String(req.params.id)}`],
-  })
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Ban a user',
@@ -274,9 +294,6 @@ export class UsersController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(ROLES.ADMIN)
-  @InvalidateCache({
-    keys: (req) => [`cache:user:detail:${String(req.params.id)}`],
-  })
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Unban a user',
@@ -290,5 +307,28 @@ export class UsersController {
   })
   unban(@User() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
     return this.unbanUserService.unban(user, id);
+  }
+
+  @Post(':id/role')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(ROLES.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Change user role (admin)',
+    description:
+      'Admin-only. Updates user role and invalidates existing Access JWTs via authz_version.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the user whose role is being changed',
+    format: 'uuid',
+  })
+  changeRole(
+    @User() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() changeRoleDto: ChangeRoleDto,
+  ) {
+    return this.changeRoleService.changeRole(user, id, changeRoleDto);
   }
 }

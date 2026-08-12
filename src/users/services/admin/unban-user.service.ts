@@ -9,36 +9,43 @@ import { db } from 'src/db';
 import { UsersRepository } from '../../repositories/users.repository';
 import { AdminAuditLogRepository } from '../../repositories/admin-audit-log.repository';
 import { toPublicUser } from '../../utils/users.mapper';
-
-import { CacheManagerService } from 'src/common/cache/services/cache-manager.service';
+import { AuthzVersionService } from 'src/common/redis/authz-version.service';
 
 @Injectable()
 export class UnbanUserService {
   constructor(
     private readonly usersRepository: UsersRepository,
     private readonly adminAuditLogRepository: AdminAuditLogRepository,
-    private readonly cacheManager: CacheManagerService,
+    private readonly authzVersionService: AuthzVersionService,
   ) {}
 
   async unban(currentUser: AuthUser, targetUserId: string) {
-    const { user, banHistory, status } = await db.transaction(async (tx) => {
-      const result = await this.usersRepository.unbanUser(targetUserId, tx);
+    const { user, banHistory, status, newVersion } = await db.transaction(
+      async (tx) => {
+        const result = await this.usersRepository.unbanUser(targetUserId, tx);
 
-      if (result.status === 'SUCCESS') {
-        await this.adminAuditLogRepository.create(
-          {
-            adminId: currentUser.id,
-            adminSessionId: currentUser.sessionId ?? null,
-            action: 'unban_user',
+        let newVersion: number | undefined;
+        if (result.status === 'SUCCESS') {
+          newVersion = await this.usersRepository.incrementAuthzVersion(
             targetUserId,
-            details: null,
-          },
-          tx,
-        );
-      }
+            tx,
+          );
 
-      return result;
-    });
+          await this.adminAuditLogRepository.create(
+            {
+              adminId: currentUser.id,
+              adminSessionId: currentUser.sessionId,
+              action: 'unban_user',
+              targetUserId,
+              details: null,
+            },
+            tx,
+          );
+        }
+
+        return { ...result, newVersion };
+      },
+    );
 
     if (status === 'NOT_FOUND') {
       throw new NotFoundException(AUTH_MESSAGES.USER_NOT_FOUND);
@@ -52,7 +59,9 @@ export class UnbanUserService {
       throw new NotFoundException(AUTH_MESSAGES.USER_NOT_FOUND);
     }
 
-    await this.cacheManager.invalidateUser(targetUserId);
+    if (newVersion !== undefined) {
+      await this.authzVersionService.setVersion(targetUserId, newVersion);
+    }
 
     return {
       message: AUTH_MESSAGES.USER_UNBANNED_SUCCESS,
