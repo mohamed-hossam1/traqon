@@ -1,13 +1,13 @@
 # Project Reference
 
 > **Last updated:** 2026-08-13 00:52  
-> **Project name:** nest-auth (Traqon back-end)
+> **Project name:** project-name-backend
 
 ---
 
 ## Project Overview
 
-A **NestJS v11 authentication API** that provides a complete, production-ready auth system for the Traqon platform. The application is a standalone REST API (not a monorepo) with the global route prefix `/api`.
+A **NestJS v11 authentication API** that provides a complete, production-ready auth system. The application is a standalone REST API (not a monorepo) with the global route prefix `/api`.
 
 ### Business Domain
 
@@ -70,8 +70,8 @@ User identity and access management — registration, login, email verification,
 | Application type | Standalone REST API |
 | Architecture style | Modular / Layered (Controller → Service → Repository) |
 | ORM | Drizzle ORM v1.0.0-rc.4 |
-| Database | PostgreSQL (Local Docker `traqon_postgres` ) |
-| Version State & Rate Limiting | Redis 7 (`ioredis` v6.0.0, Local Docker `traqon_redis`) |
+| Database | PostgreSQL (Local Docker `project_name_postgres` ) |
+| Version State & Rate Limiting | Redis 7 (`ioredis` v6.0.0, Local Docker `project_name_redis`) |
 | Rate Limiting | `@nestjs/throttler` v6.5.0 + `RedisThrottlerStorageService` |
 | API prefix | `/api` |
 | Swagger docs | `/api/docs` |
@@ -412,7 +412,7 @@ export type AuthUser = {
 - Uses native **Web Locks API** (`navigator.locks.request('auth-refresh', ...)`) to prevent race conditions when multiple browser tabs trigger refresh requests simultaneously
 - Only one tab performs `POST /api/auth/refresh` at a time while other tabs wait
 - After acquiring the lock, waiting tabs re-check authentication state and timestamp to avoid redundant refresh calls
-- `BroadcastChannel('traqon_auth_refresh')` broadcasts refresh success events across active browser tabs
+- `BroadcastChannel('project_name_auth_refresh')` broadcasts refresh success events across active browser tabs
 
 ---
 

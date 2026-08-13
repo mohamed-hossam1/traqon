@@ -18,7 +18,7 @@ export class PasswordResetEmail implements Email {
     const content = `
       <h1 style="margin:0 0 16px 0; font-family:Georgia, serif; font-style:italic; font-size:24px; font-weight:normal; color:#f2ede4;">${greeting}</h1>
       <p style="margin:0 0 20px 0; color:#b0a79a; font-size:14px; line-height:1.6;">
-        We received a request to reset your password for your Traqon account. Click the button below to set a new password.
+        We received a request to reset your password for your account. Click the button below to set a new password.
       </p>
       
       <div style="margin:28px 0; text-align:left;">
@@ -33,8 +33,8 @@ export class PasswordResetEmail implements Email {
     `;
 
     this.html = renderEmailTemplate({
-      title: 'Reset your password - Traqon',
-      preheader: 'Reset your password for your Traqon account.',
+      title: 'Reset your password',
+      preheader: 'Reset your password for your account.',
       contentHtml: content,
     });
   }

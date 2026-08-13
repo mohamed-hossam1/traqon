@@ -23,7 +23,7 @@ export function renderEmailTemplate({
           
           <tr>
             <td style="padding:32px 32px 24px 32px; border-bottom:1px solid #332f28;">
-              <span style="font-family:'Courier New', Courier, monospace; font-size:14px; font-weight:bold; letter-spacing:0.25em; text-transform:uppercase; color:#c85a32;">TRAQON</span>
+              <span style="font-family:'Courier New', Courier, monospace; font-size:14px; font-weight:bold; letter-spacing:0.25em; text-transform:uppercase; color:#c85a32;">PROJECT NAME</span>
             </td>
           </tr>
 
@@ -35,7 +35,7 @@ export function renderEmailTemplate({
 
           <tr>
             <td style="padding:24px 32px; background-color:#181613; border-top:1px solid #332f28; font-family:'Courier New', Courier, monospace; font-size:11px; color:#857d71; text-transform:uppercase; letter-spacing:0.1em;">
-              © ${new Date().getFullYear()} Traqon App · Security & Verification
+              © ${new Date().getFullYear()} Security & Verification
             </td>
           </tr>
 

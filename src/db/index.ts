@@ -4,7 +4,7 @@ import * as schema from './schema';
 
 const connectionString =
   process.env.DATABASE_URL ||
-  'postgresql://postgres:postgrespassword@localhost:5433/traqon_db';
+  'postgresql://postgres:postgrespassword@localhost:5433/project_name_db';
 
 const pool = new Pool({ connectionString });
 
