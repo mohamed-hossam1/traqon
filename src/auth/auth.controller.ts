@@ -343,6 +343,9 @@ export class AuthController {
     res.clearCookie('oauth_action', clearCookieOptions);
     res.clearCookie('oauth_link_user_id', clearCookieOptions);
 
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
+
     if (
       !state ||
       !cookieState ||
@@ -350,7 +353,9 @@ export class AuthController {
       !cookieCodeVerifier ||
       !code
     ) {
-      throw new BadRequestException(AUTH_MESSAGES.OAUTH_VALIDATION_FAILED);
+      return res.redirect(
+        `${frontendUrl}/oauth/callback?error=oauth_validation_failed`,
+      );
     }
 
     const appUrl =
@@ -367,17 +372,37 @@ export class AuthController {
       );
     }
 
-    await this.googleOauthCallbackService.handleCallback(
-      currentUrl,
-      cookieState,
-      cookieCodeVerifier,
-      res,
-      req,
-    );
+    try {
+      await this.googleOauthCallbackService.handleCallback(
+        currentUrl,
+        cookieState,
+        cookieCodeVerifier,
+        res,
+        req,
+      );
 
-    const frontendUrl =
-      this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
-    res.redirect(`${frontendUrl}/oauth/callback`);
+      return res.redirect(`${frontendUrl}/oauth/callback`);
+    } catch (err: any) {
+      const errorMsg: string = err?.message || '';
+      const isBanned =
+        errorMsg.includes(AUTH_MESSAGES.ACCOUNT_BANNED) ||
+        errorMsg.toLowerCase().includes('banned');
+
+      if (isBanned) {
+        let banReason = '';
+        if (errorMsg.includes(':')) {
+          banReason = errorMsg.split(':').slice(1).join(':').trim();
+        }
+        const redirectUrl = banReason
+          ? `${frontendUrl}/oauth/callback?error=account_banned&reason=${encodeURIComponent(banReason)}`
+          : `${frontendUrl}/oauth/callback?error=account_banned`;
+        return res.redirect(redirectUrl);
+      }
+
+      return res.redirect(
+        `${frontendUrl}/oauth/callback?error=oauth_validation_failed`,
+      );
+    }
   }
 
   @Get('accounts')
