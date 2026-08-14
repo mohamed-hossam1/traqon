@@ -269,37 +269,34 @@ git clone https://github.com/your-org/project-template.git
 cd project-template
 
 # Setup Backend Environment
-cp back-end/.env.example back-end/.env
+cp apps/backend/.env.example apps/backend/.env
 
 # Setup Frontend Environment
-cp front-end/.env.example front-end/.env.local
+cp apps/frontend/.env.example apps/frontend/.env.local
 ```
 
 ### 2. Infrastructure Spin-up (Docker)
 ```bash
-cd back-end
+cd apps/backend
 docker-compose up -d
 # Spawns PostgreSQL on port 5432 and Redis on port 6379
 ```
 
 ### 3. Database Migration & Schema Seeding
 ```bash
-cd back-end
-npm install
-npm run db:generate
-npm run db:migrate
+pnpm install
+cd apps/backend
+pnpm db:generate
+pnpm db:migrate
 ```
 
 ### 4. Running Development Servers
 ```bash
 # Terminal 1 — NestJS API Service
-cd back-end
-npm run start:dev
+pnpm dev:back
 
 # Terminal 2 — Next.js Frontend Client
-cd front-end
-npm install
-npm run dev
+pnpm dev:front
 ```
 
 > **Interactive Swagger API Documentation:** Available at `http://localhost:4000/api/docs`  

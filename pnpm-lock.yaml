@@ -8,7 +8,7 @@ importers:
 
   .: {}
 
-  back-end:
+  apps/backend:
     dependencies:
       '@neondatabase/serverless':
         specifier: ^1.1.0
@@ -159,7 +159,7 @@ importers:
         specifier: ^8.20.0
         version: 8.68.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
 
-  front-end:
+  apps/frontend:
     dependencies:
       '@hookform/resolvers':
         specifier: ^5.4.0
@@ -9500,7 +9500,7 @@ snapshots:
 
   '@types/ws@8.18.1':
     dependencies:
-      '@types/node': 20.19.43
+      '@types/node': 24.13.3
 
   '@types/yargs-parser@21.0.3': {}
 

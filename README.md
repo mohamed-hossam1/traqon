@@ -40,18 +40,20 @@ graph LR
 
 ```text
 project-template/
-├── back-end/               # NestJS 11 REST API Service
-│   ├── src/
-│   │   ├── auth/           # Login, Register, OAuth, Refresh, Verification
-│   │   ├── users/          # Profile management & Admin User CRUD
-│   │   ├── common/         # AuthzVersionService, Idempotency, Throttling, Guards
-│   │   ├── db/             # Drizzle Schema & PostgreSQL Connection
-│   │   └── email/          # Transactional Email Templates (Resend)
-│   └── PROJECT_REFERENCE.md # Technical Backend Architecture Reference
-├── front-end/              # Next.js 16 App Router Client
-│   ├── app/                # React Server Components & Action Handlers
-│   ├── components/         # Radix UI & Modern Tailwind Components
-│   └── PROJECT_REFERENCE.md # Technical Frontend Architecture Reference
+├── apps/
+│   ├── backend/            # NestJS 11 REST API Service
+│   │   ├── src/
+│   │   │   ├── auth/       # Login, Register, OAuth, Refresh, Verification
+│   │   │   ├── users/      # Profile management & Admin User CRUD
+│   │   │   ├── common/     # AuthzVersionService, Idempotency, Throttling, Guards
+│   │   │   ├── db/         # Drizzle Schema & PostgreSQL Connection
+│   │   │   └── email/      # Transactional Email Templates (Resend)
+│   │   └── PROJECT_REFERENCE.md # Technical Backend Architecture Reference
+│   └── frontend/           # Next.js 16 App Router Client
+│       ├── app/            # React Server Components & Action Handlers
+│       ├── components/     # Radix UI & Modern Tailwind Components
+│       └── PROJECT_REFERENCE.md # Technical Frontend Architecture Reference
+├── pnpm-workspace.yaml     # Workspace declaration
 ├── PROJECT.md              # 📖 Master Project Specification & Deep-Dive
 └── README.md               # 📌 Root Portal & Overview Guide
 ```
@@ -60,26 +62,23 @@ project-template/
 
 ## ⚡ Quickstart
 
-### 1. Launch Infrastructure
+### 1. Launch Infrastructure & Install Dependencies
 ```bash
-cd back-end
-docker-compose up -d
+pnpm install
+cd apps/backend && docker-compose up -d
 ```
 
 ### 2. Start Backend API
 ```bash
-cd back-end
-npm install
-npm run db:migrate
-npm run start:dev
+pnpm dev:back
+# OR: cd apps/backend && pnpm start:dev
 ```
 > Interactive API Docs: `http://localhost:4000/api/docs`
 
 ### 3. Start Frontend Client
 ```bash
-cd front-end
-npm install
-npm run dev
+pnpm dev:front
+# OR: cd apps/frontend && pnpm dev
 ```
 > Frontend Application: `http://localhost:3000`
 
