@@ -1,0 +1,424 @@
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiCookieAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+import { IdempotencyInterceptor } from '../common/interceptors/idempotency.interceptor';
+
+import {
+  SignUpDto,
+  SignInDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+  VerifyEmailDto,
+  ResendVerificationEmailDto,
+  RevokeSessionDto,
+  SessionsListResponseDto,
+  SetPasswordDto,
+  UnlinkOauthAccountDto,
+  ChangePasswordDto,
+} from './dtos';
+import type { Request, Response } from 'express';
+import { AuthGuard } from '../common/guards/auth.guard';
+import { User } from 'src/common/decorators/user.decorator';
+import type { AuthUser } from 'src/common/types/auth-user.type';
+import { AUTH_MESSAGES } from 'src/common/constants/messages.constant';
+import { ConfigService } from '@nestjs/config';
+import {
+  SignUpService,
+  SignInService,
+  VerifyEmailService,
+  LogoutService,
+  ListSessionsService,
+  RevokeSessionService,
+  RevokeAllOtherSessionsService,
+  ForgotPasswordService,
+  ResetPasswordService,
+  RefreshService,
+  ChangePasswordService,
+  ResendVerificationEmailService,
+  GoogleOauthLoginService,
+  GoogleOauthCallbackService,
+  SetPasswordService,
+  ListOauthAccountsService,
+  UnlinkOauthAccountService,
+} from './services';
+
+@ApiTags('auth')
+@Controller('auth')
+export class AuthController {
+  constructor(
+    private readonly signUpService: SignUpService,
+    private readonly signInService: SignInService,
+    private readonly verifyEmailService: VerifyEmailService,
+    private readonly logoutService: LogoutService,
+    private readonly listSessionsService: ListSessionsService,
+    private readonly revokeSessionService: RevokeSessionService,
+    private readonly revokeAllOtherSessionsService: RevokeAllOtherSessionsService,
+    private readonly forgotPasswordService: ForgotPasswordService,
+    private readonly resetPasswordService: ResetPasswordService,
+    private readonly refreshService: RefreshService,
+    private readonly changePasswordService: ChangePasswordService,
+    private readonly resendVerificationEmailService: ResendVerificationEmailService,
+    private readonly googleOauthLoginService: GoogleOauthLoginService,
+    private readonly googleOauthCallbackService: GoogleOauthCallbackService,
+    private readonly configService: ConfigService,
+    private readonly setPasswordService: SetPasswordService,
+    private readonly listOauthAccountsService: ListOauthAccountsService,
+    private readonly unlinkOauthAccountService: UnlinkOauthAccountService,
+  ) {}
+
+  @Post('sign-up')
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @ApiOperation({ summary: 'Register a new account' })
+  signUp(@Body() signUpDto: SignUpDto) {
+    return this.signUpService.signUp(signUpDto);
+  }
+
+  @Post('sign-in')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @ApiOperation({ summary: 'Sign in with email and password' })
+  signIn(
+    @Body() signInDto: SignInDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.signInService.signIn(signInDto, res, req);
+  }
+
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(IdempotencyInterceptor)
+  @ApiOperation({
+    summary: 'Verify email address and auto sign in',
+    description:
+      'Accepts the verification token from the email link. Must be POST so link scanners cannot consume the one-time token.',
+  })
+  verifyEmail(
+    @Body() verifyEmailDto: VerifyEmailDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.verifyEmailService.verifyEmail(verifyEmailDto.token, res, req);
+  }
+
+  @Post('resend-verification-email')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 3, ttl: 900000 } })
+  @ApiOperation({
+    summary: 'Resend a verification email',
+    description:
+      'Sends a new verification email for an existing unverified account. Does not create a new account.',
+  })
+  resendVerificationEmail(
+    @Body() resendVerificationEmailDto: ResendVerificationEmailDto,
+  ) {
+    return this.resendVerificationEmailService.resendVerificationEmail(
+      resendVerificationEmailDto.email,
+    );
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @UseInterceptors(IdempotencyInterceptor)
+  @ApiOperation({ summary: 'Refresh access token using refresh cookie' })
+  @ApiCookieAuth('refresh_token')
+  refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    return this.refreshService.refresh(req.cookies?.refresh_token, res, req);
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  @ApiCookieAuth('refresh_token')
+  @ApiOperation({ summary: 'Logout and revoke the current refresh session' })
+  logout(
+    @User() user: AuthUser,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.logoutService.logout(user.id, res, req.cookies?.refresh_token);
+  }
+
+  @Get('sessions')
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  @ApiCookieAuth('refresh_token')
+  @ApiOperation({
+    summary: 'List active refresh sessions',
+    description:
+      'Returns all active (non-revoked, non-expired) refresh sessions for the authenticated user.',
+  })
+  @ApiOkResponse({ type: SessionsListResponseDto })
+  listSessions(@User() user: AuthUser, @Req() req: Request) {
+    return this.listSessionsService.listSessions(
+      user.id,
+      req.cookies?.refresh_token,
+    );
+  }
+
+  @Post('sessions/revoke')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  @ApiCookieAuth('refresh_token')
+  @ApiOperation({
+    summary: 'Revoke a specific refresh session',
+    description:
+      'Revokes a single refresh session owned by the authenticated user. Clears the refresh cookie when the current session is revoked.',
+  })
+  revokeSession(
+    @User() user: AuthUser,
+    @Body() revokeSessionDto: RevokeSessionDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.revokeSessionService.revokeSession(
+      user.id,
+      revokeSessionDto.sessionId,
+      res,
+      req.cookies?.refresh_token,
+    );
+  }
+
+  @Post('sessions/revoke-all')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  @ApiCookieAuth('refresh_token')
+  @ApiOperation({
+    summary:
+      'Revoke all other active refresh sessions for the authenticated user.',
+    description:
+      'Revokes every active refresh session for the authenticated user except the current session associated with the request. The current session remains active and no new refresh token is issued.',
+  })
+  revokeAllOtherSessions(@User() user: AuthUser, @Req() req: Request) {
+    return this.revokeAllOtherSessionsService.revokeAllOtherSessions(
+      user.id,
+      req.cookies?.refresh_token,
+    );
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 3, ttl: 900000 } })
+  @ApiOperation({ summary: 'Request a password reset email' })
+  forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    return this.forgotPasswordService.forgotPassword(forgotPasswordDto);
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 900000 } })
+  @ApiOperation({ summary: 'Reset password using a reset token' })
+  resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    return this.resetPasswordService.resetPassword(resetPasswordDto);
+  }
+
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard)
+  @Throttle({ default: { limit: 5, ttl: 900000 } })
+  @ApiBearerAuth()
+  @ApiCookieAuth('refresh_token')
+  @ApiOperation({ summary: 'Change the authenticated user password' })
+  changePassword(
+    @User() user: AuthUser,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ) {
+    return this.changePasswordService.changePassword(user, changePasswordDto);
+  }
+
+  @Post('set-password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  @ApiCookieAuth('refresh_token')
+  @ApiOperation({ summary: 'Set password for an account without one' })
+  setPassword(@User() user: AuthUser, @Body() setPasswordDto: SetPasswordDto) {
+    return this.setPasswordService.setPassword(user, setPasswordDto);
+  }
+
+  @Get('google')
+  @ApiOperation({ summary: 'Initiate Google OAuth login flow' })
+  async googleLogin(@Res() res: Response) {
+    const { url, state, codeVerifier } =
+      await this.googleOauthLoginService.generateAuthParams();
+
+    const isProduction = this.configService.get('NODE_ENV') === 'production';
+
+    res.cookie('oauth_state', state, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: 10 * 60 * 1000,
+    });
+
+    res.cookie('oauth_code_verifier', codeVerifier, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: 10 * 60 * 1000,
+    });
+
+    res.redirect(url);
+  }
+
+  @Get('google/link')
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  @ApiCookieAuth('refresh_token')
+  @ApiOperation({ summary: 'Initiate Google OAuth account linking flow' })
+  async googleLink(
+    @User() user: AuthUser,
+    @Res() res: Response,
+    @Req() req: Request,
+  ) {
+    const { url, state, codeVerifier } =
+      await this.googleOauthLoginService.generateAuthParams();
+
+    const isProduction = this.configService.get('NODE_ENV') === 'production';
+    const cookieOptions = {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax' as const,
+      maxAge: 10 * 60 * 1000,
+    };
+
+    res.cookie('oauth_state', state, cookieOptions);
+    res.cookie('oauth_code_verifier', codeVerifier, cookieOptions);
+    res.cookie('oauth_action', 'link', cookieOptions);
+    res.cookie('oauth_link_user_id', user.id, cookieOptions);
+
+    if (
+      req.headers.accept?.includes('application/json') ||
+      req.headers['x-requested-with'] === 'XMLHttpRequest'
+    ) {
+      return res.status(200).json({ url });
+    }
+
+    res.redirect(url);
+  }
+
+  @Get('google/callback')
+  @ApiOperation({ summary: 'Google OAuth callback handler' })
+  async googleCallback(@Req() req: Request, @Res() res: Response) {
+    const state = req.query.state as string | undefined;
+    const code = req.query.code as string | undefined;
+
+    const cookieState = req.cookies?.oauth_state as string | undefined;
+    const cookieCodeVerifier = req.cookies?.oauth_code_verifier as
+      string | undefined;
+    const oauthAction = req.cookies?.oauth_action as string | undefined;
+    const oauthLinkUserId = req.cookies?.oauth_link_user_id as
+      string | undefined;
+
+    const isProduction = this.configService.get('NODE_ENV') === 'production';
+    const clearCookieOptions = {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax' as const,
+    };
+    res.clearCookie('oauth_state', clearCookieOptions);
+    res.clearCookie('oauth_code_verifier', clearCookieOptions);
+    res.clearCookie('oauth_action', clearCookieOptions);
+    res.clearCookie('oauth_link_user_id', clearCookieOptions);
+
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
+
+    if (
+      !state ||
+      !cookieState ||
+      state !== cookieState ||
+      !cookieCodeVerifier ||
+      !code
+    ) {
+      return res.redirect(
+        `${frontendUrl}/oauth/callback?error=oauth_validation_failed`,
+      );
+    }
+
+    const appUrl =
+      this.configService.get<string>('APP_URL') ?? 'http://localhost:5000';
+    const currentUrl = new URL(req.url, appUrl);
+
+    if (oauthAction === 'link' && oauthLinkUserId) {
+      return this.googleOauthCallbackService.handleLinkCallback(
+        currentUrl,
+        cookieState,
+        cookieCodeVerifier,
+        oauthLinkUserId,
+        res,
+      );
+    }
+
+    try {
+      await this.googleOauthCallbackService.handleCallback(
+        currentUrl,
+        cookieState,
+        cookieCodeVerifier,
+        res,
+        req,
+      );
+
+      return res.redirect(`${frontendUrl}/oauth/callback`);
+    } catch (err: any) {
+      const errorMsg: string = err?.message || '';
+      const isBanned =
+        errorMsg.includes(AUTH_MESSAGES.ACCOUNT_BANNED) ||
+        errorMsg.toLowerCase().includes('banned');
+
+      if (isBanned) {
+        let banReason = '';
+        if (errorMsg.includes(':')) {
+          banReason = errorMsg.split(':').slice(1).join(':').trim();
+        }
+        const redirectUrl = banReason
+          ? `${frontendUrl}/oauth/callback?error=account_banned&reason=${encodeURIComponent(banReason)}`
+          : `${frontendUrl}/oauth/callback?error=account_banned`;
+        return res.redirect(redirectUrl);
+      }
+
+      return res.redirect(
+        `${frontendUrl}/oauth/callback?error=oauth_validation_failed`,
+      );
+    }
+  }
+
+  @Get('accounts')
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List linked OAuth accounts for current user' })
+  listUserAccounts(@User() user: AuthUser) {
+    return this.listOauthAccountsService.listAccounts(user.id);
+  }
+
+  @Post('accounts/unlink')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Unlink an OAuth account' })
+  unlinkAccount(@User() user: AuthUser, @Body() dto: UnlinkOauthAccountDto) {
+    return this.unlinkOauthAccountService.unlinkAccount(user.id, dto.provider);
+  }
+}

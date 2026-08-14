@@ -1,0 +1,85 @@
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  AUTH_MESSAGES,
+  VALIDATION_MESSAGES,
+} from 'src/common/constants/messages.constant';
+import type { AuthUser } from 'src/common/types/auth-user.type';
+import { db } from 'src/db';
+import { BanUserDto } from '../../dtos/ban-user.dto';
+import { UsersRepository } from '../../repositories/users.repository';
+import { RefreshSessionsRepository } from '../../repositories/refresh-sessions.repository';
+import { AdminAuditLogRepository } from '../../repositories/admin-audit-log.repository';
+import { toPublicUser } from '../../utils/users.mapper';
+import { AuthzVersionService } from 'src/common/redis/authz-version.service';
+
+@Injectable()
+export class BanUserService {
+  constructor(
+    private readonly usersRepository: UsersRepository,
+    private readonly refreshSessionsRepository: RefreshSessionsRepository,
+    private readonly adminAuditLogRepository: AdminAuditLogRepository,
+    private readonly authzVersionService: AuthzVersionService,
+  ) {}
+
+  async ban(currentUser: AuthUser, targetUserId: string, dto: BanUserDto) {
+    if (currentUser.id === targetUserId) {
+      throw new BadRequestException(AUTH_MESSAGES.CANNOT_BAN_SELF);
+    }
+
+    const banReason = dto.banReason.trim();
+    if (!banReason) {
+      throw new BadRequestException(VALIDATION_MESSAGES.BAN_REASON_REQUIRED);
+    }
+
+    try {
+      const { user, ban, banHistory, newVersion } = await db.transaction(
+        async (tx) => {
+          const result = await this.usersRepository.banUser(
+            targetUserId,
+            banReason,
+            tx,
+          );
+
+          const newVersion = await this.usersRepository.incrementAuthzVersion(
+            targetUserId,
+            tx,
+          );
+
+          await this.refreshSessionsRepository.revokeAll(targetUserId, tx);
+
+          await this.adminAuditLogRepository.create(
+            {
+              adminId: currentUser.id,
+              adminSessionId: currentUser.sessionId,
+              action: 'ban_user',
+              targetUserId,
+              details: JSON.stringify({ banReason }),
+            },
+            tx,
+          );
+
+          return { ...result, newVersion };
+        },
+      );
+
+      await this.authzVersionService.setVersion(targetUserId, newVersion);
+
+      return {
+        message: AUTH_MESSAGES.USER_BANNED_SUCCESS,
+        user: toPublicUser(user, ban, banHistory),
+      };
+    } catch (error: any) {
+      if (error?.code === '23505') {
+        throw new BadRequestException(AUTH_MESSAGES.USER_ALREADY_BANNED);
+      }
+      if (error?.code === '23503') {
+        throw new NotFoundException(AUTH_MESSAGES.USER_NOT_FOUND);
+      }
+      throw error;
+    }
+  }
+}
