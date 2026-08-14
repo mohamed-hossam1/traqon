@@ -1,7 +1,7 @@
 # Project Reference
 
 > **Last updated:** 2026-08-13 00:52  
-> **Project name:** project-name-backend
+> **Project name:** backend
 
 ---
 

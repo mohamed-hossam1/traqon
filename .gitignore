@@ -1,0 +1,58 @@
+# Dependencies & Store
+node_modules/
+.pnpm-store/
+.pnp
+.pnp.*
+
+# Build Outputs
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# Environmental variables
+.env
+.env*.local
+!.env.example
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-debug.log*
+
+# OS & Editor
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Coverage & Testing
+coverage/
+.nyc_output
+
+# Temp & Runtime
+.temp/
+.tmp/
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# AI Agent & Spec Tooling
+.agents/
+.specify/
+.kilocode/
+.opencode/
+specs/
+skills-lock.json
+*.png
+*.jpg
+*.jpeg
