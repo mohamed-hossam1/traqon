@@ -1,6 +1,6 @@
 # 🎨 Front-End (Next.js 16 Client)
 
-> **Modern, high-performance Web Application client for the IAM platform built with Next.js 16 (App Router & Turbopack), React 19, Bun, Tailwind CSS v4, and TanStack React Query v5.**
+> **Modern, high-performance Web Application client for the IAM platform built with Next.js 16 (App Router & Turbopack), React 19, Tailwind CSS v4, and TanStack React Query v5.**
 
 ---
 
@@ -21,7 +21,7 @@
 
 ## 🚀 Overview
 
-The **Front-End Application** is a standalone, single-page application style Next.js client built for high security, multi-tab session synchronization, and an editorial user experience. It communicates seamlessly with the NestJS REST API using Next.js Server Actions (`next-safe-action`), Axios, and TanStack React Query.
+The **Front-End Application** is a Next.js 16 client located inside the `apps/frontend` workspace of the monorepo. It is built for high security, multi-tab session synchronization, and an editorial user experience. It communicates seamlessly with the NestJS REST API using Next.js Server Actions (`next-safe-action`), Axios, and TanStack React Query.
 
 ---
 
@@ -67,14 +67,14 @@ graph TD
     UserAction[User Interaction] --> ClientComponent[Client Component / Page]
     ClientComponent -->|Trigger| ServerAction[Server Action - actions/*.ts]
     ServerAction -->|Axios Client| ApiClient[lib/api/client.ts]
-    
+
     subgraph Multi-Tab Sync
         ApiClient -->|Check Lock| WebLocks[Web Locks API: auth-refresh]
         WebLocks -->|Refresh Lock Acquired| NestAPI[NestJS API /api]
         NestAPI -->|New Tokens| Broadcast[BroadcastChannel: project_name_auth_refresh]
         Broadcast -->|Notify Other Tabs| WaitingTabs[Waiting Browser Tabs]
     end
-    
+
     ApiClient -->|Response| ReactQuery[React Query Cache]
     ReactQuery -->|UI Update| ClientComponent
 ```
@@ -88,7 +88,7 @@ graph TD
 | **Framework** | Next.js v16.3.0 (App Router, Turbopack) |
 | **Library** | React v19.2.4 |
 | **Language** | TypeScript v5 |
-| **Package Manager / Runtime** | Bun |
+| **Package Manager** | `pnpm` (Workspace Monorepo) |
 | **Styling** | Tailwind CSS v4 (`@tailwindcss/postcss`) |
 | **Components** | Radix UI primitives |
 | **Icons** | Lucide React |
@@ -105,11 +105,12 @@ graph TD
 
 ### Prerequisites
 
-- **Bun**: `v1.1+`
+- **Node.js**: `v24+`
+- **pnpm**: `v10+` / `v11+`
 
 ### 1. Environment Setup
 
-Create `.env.local` in the `front-end` directory:
+Create `.env.local` inside the `apps/frontend/` directory:
 
 ```env
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
@@ -119,14 +120,20 @@ NEXT_PUBLIC_SUPPORT_EMAIL="support@example.com"
 
 ### 2. Install Dependencies
 
+From the monorepo root:
+
 ```bash
-bun install
+pnpm install
 ```
 
 ### 3. Run Development Server
 
 ```bash
-bun run dev --turbo
+# From monorepo root
+pnpm dev:front
+
+# OR from apps/frontend/
+cd apps/frontend && pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
@@ -135,8 +142,8 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## 📂 Project Structure
 
-```
-front-end/
+```text
+apps/frontend/
 ├── actions/                            # Next.js Server Actions (admin, auth, profile)
 ├── app/                                # Next.js App Router
 │   ├── (admin)/                        # Admin layout & pages (/admin/users, /admin/audit-logs)
@@ -182,17 +189,14 @@ front-end/
 ## 📜 Available Scripts
 
 ```bash
-# Run development server with Turbopack
-bun run dev --turbo
+# Run development server
+pnpm --filter frontend dev
 
 # Build application for production
-bun run build
-
-# Start production server
-bun run start
+pnpm --filter frontend build
 
 # Run ESLint check
-bun run lint
+pnpm --filter frontend lint
 ```
 
 ---

@@ -21,7 +21,7 @@
 
 ## 🚀 Overview
 
-**Back-End Identity API** is a production-ready, standalone RESTful API designed to provide robust user identity, authentication, session lifecycle management, and role-based access control (RBAC). It introduces novel engineering solutions to common distributed auth problems—such as sub-millisecond JWT invalidation without per-request DB hits, multi-tab session synchronization, timing-attack mitigation, and Redis-backed idempotency & rate-limiting.
+**Back-End Identity API** is a production-ready RESTful API service located inside the `apps/backend` workspace of the monorepo. It provides robust user identity, authentication, session lifecycle management, and role-based access control (RBAC). It introduces novel engineering solutions to common distributed auth problems—such as sub-millisecond JWT invalidation without per-request DB hits, multi-tab session synchronization, timing-attack mitigation, fail-fast environment validation, and Redis-backed idempotency & rate-limiting.
 
 ---
 
@@ -70,29 +70,34 @@ Explore the comprehensive visual step-by-step logic for all Guards, Interceptors
 - **Constant-Time Verification:** Dummy bcrypt hash calculation on missing users during sign-in to eliminate side-channel timing attacks and account enumeration.
 - **SHA-256 Hashed Refresh Tokens:** Stored securely in DB with timing-safe comparison (`timingSafeEqual`) and strict single-use token rotation.
 - **Google OAuth 2.0 + PKCE:** OpenID Connect integration with lazy config initialization, automatic & manual account linking/unlinking, and graceful error redirects.
+- **Fail-Fast Environment Validation:** `env.validation.ts` schema powered by `class-validator` validating required environment variables on startup.
+- **Dependency-Injected Exception Filter:** Global `HttpExceptionFilter` bound via `APP_FILTER` in `AppModule`.
+- **Monorepo CORS Support:** Configurable `app.enableCors()` with credentials support for frontend client requests.
 
 ### 3. Distributed Infrastructure & Resilience
 
 - **API Idempotency:** Redis-backed `X-Idempotency-Key` interceptor preventing duplicate processing during network retries.
 - **Distributed Rate Limiting:** Custom `@nestjs/throttler` storage tracking IP + User ID keys with per-route overrides.
 - **Acyclic Modular Design:** Extracted repository providers into `UsersRepositoriesModule` to strictly prevent NestJS circular dependencies.
+- **Active Health Checks:** Public status endpoint at `/api/health` performing live PostgreSQL and Redis pings.
 - **Admin Audit Trail:** Immutable logging (`admin_audit_logs`) tracking administrative actions (bans, unbans, role changes, session revocations) executed within the same database transaction.
 
 ---
 
 ## 🛠️ Tech Stack
 
-| Domain             | Technology                                                |
-| ------------------ | --------------------------------------------------------- |
-| **Framework**      | NestJS v11.0.1                                            |
-| **Runtime**        | Node.js v24.18.0                                          |
-| **Language**       | TypeScript v5.7.3 (ES2023)                                |
-| **Database**       | PostgreSQL (Docker)                                       |
-| **ORM**            | Drizzle ORM v1.0.0-rc.4                                   |
-| **Cache & State**  | Redis 7 (`ioredis` v6.0.0)                                |
-| **Rate Limiting**  | `@nestjs/throttler` v6.5.0 + RedisThrottlerStorageService |
-| **Documentation**  | Swagger / OpenAPI (`/api/docs`)                           |
-| **Email Delivery** | Resend SDK                                                |
+| Domain | Technology |
+|---|---|
+| **Framework** | NestJS v11.0.1 |
+| **Runtime** | Node.js v24.18.0 |
+| **Language** | TypeScript v5.7.3 (ES2023) |
+| **Package Manager** | `pnpm` (Workspace Monorepo) |
+| **Database** | PostgreSQL (Docker) |
+| **ORM** | Drizzle ORM v1.0.0-rc.4 |
+| **Cache & State** | Redis 7 (`ioredis` v6.0.0) |
+| **Rate Limiting** | `@nestjs/throttler` v6.5.0 + RedisThrottlerStorageService |
+| **Documentation** | Swagger / OpenAPI (`/api/docs`) |
+| **Email Delivery** | Resend SDK |
 
 ---
 
@@ -101,12 +106,12 @@ Explore the comprehensive visual step-by-step logic for all Guards, Interceptors
 ### Prerequisites
 
 - **Node.js**: `v24+`
-- **Docker & Docker Compose**: For running PostgreSQL and Redis containers locally.
-- **Bun** or **npm**
+- **pnpm**: `v10+` / `v11+`
+- **Docker & Docker Compose**: For running PostgreSQL and Redis containers.
 
 ### 1. Environment Setup
 
-Copy `.env.example` to `.env` and fill in the required configuration:
+Copy `.env.example` to `.env` inside `apps/backend/`:
 
 ```bash
 cp .env.example .env
@@ -150,23 +155,27 @@ FRONTEND_URL=http://localhost:3000
 Start PostgreSQL and Redis:
 
 ```bash
+cd apps/backend
 docker compose up -d
 ```
 
 ### 3. Install Dependencies & Run Server
 
+From the monorepo root:
+
 ```bash
-# Install dependencies
-npm install
+# Install workspace dependencies
+pnpm install
 
-# Push database schema
-npm run db:push
+# Push database schema / apply migrations
+pnpm --filter backend db:push
 
-# Start development server
-npm run start:dev
+# Start backend development server
+pnpm dev:back
+# OR: cd apps/backend && pnpm start:dev
 ```
 
-The API will be available at `http://localhost:5000/api`.
+The API will be available at `http://localhost:5000/api`.  
 Interactive Swagger API documentation is available at `http://localhost:5000/api/docs`.
 
 ---
@@ -177,13 +186,13 @@ Drizzle ORM handles database operations and schema management.
 
 ```bash
 # Generate migrations from schema changes
-npm run drizzle:generate
+pnpm --filter backend db:generate
 
 # Apply migrations to database
-npm run drizzle:migrate
+pnpm --filter backend db:migrate
 
 # Open Drizzle Studio UI
-npm run drizzle:studio
+pnpm --filter backend db:studio
 ```
 
 ---
@@ -192,52 +201,52 @@ npm run drizzle:studio
 
 ### Public & Authentication (`/api/auth`)
 
-| Method | Endpoint                              | Description                                       |
-| ------ | ------------------------------------- | ------------------------------------------------- |
-| `POST` | `/api/auth/sign-up`                   | Register new user account                         |
-| `POST` | `/api/auth/sign-in`                   | Authenticate with email/password                  |
-| `POST` | `/api/auth/verify-email`              | Confirm email via token                           |
-| `POST` | `/api/auth/resend-verification-email` | Resend verification email                         |
-| `POST` | `/api/auth/refresh`                   | Silent access token refresh using httpOnly cookie |
-| `POST` | `/api/auth/logout`                    | Revoke current refresh session & clear cookie     |
-| `POST` | `/api/auth/forgot-password`           | Request password reset email                      |
-| `POST` | `/api/auth/reset-password`            | Reset password using reset token                  |
-| `GET`  | `/api/auth/google`                    | Initiate Google OAuth 2.0 login                   |
-| `GET`  | `/api/auth/google/callback`           | Google OAuth callback handler                     |
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/auth/sign-up` | Register new user account |
+| `POST` | `/api/auth/sign-in` | Authenticate with email/password |
+| `POST` | `/api/auth/verify-email` | Confirm email via token |
+| `POST` | `/api/auth/resend-verification-email` | Resend verification email |
+| `POST` | `/api/auth/refresh` | Silent access token refresh using httpOnly cookie |
+| `POST` | `/api/auth/logout` | Revoke current refresh session & clear cookie |
+| `POST` | `/api/auth/forgot-password` | Request password reset email |
+| `POST` | `/api/auth/reset-password` | Reset password using reset token |
+| `GET` | `/api/auth/google` | Initiate Google OAuth 2.0 login |
+| `GET` | `/api/auth/google/callback` | Google OAuth callback handler |
 
 ### User Profile & Sessions (`/api/auth` & `/api/users`)
 
-| Method   | Endpoint                        | Description                          |
-| -------- | ------------------------------- | ------------------------------------ |
-| `GET`    | `/api/users/me`                 | Fetch authenticated user profile     |
-| `PATCH`  | `/api/users/me`                 | Update name / profile                |
-| `DELETE` | `/api/users/me`                 | Self-service account deletion        |
-| `POST`   | `/api/auth/change-password`     | Change password (authenticated)      |
-| `POST`   | `/api/auth/set-password`        | Set password for OAuth-only accounts |
-| `GET`    | `/api/auth/sessions`            | List active sessions                 |
-| `POST`   | `/api/auth/sessions/revoke`     | Revoke single active session         |
-| `POST`   | `/api/auth/sessions/revoke-all` | Revoke all other active sessions     |
-| `GET`    | `/api/auth/accounts`            | List linked OAuth accounts           |
-| `POST`   | `/api/auth/accounts/unlink`     | Unlink an OAuth account              |
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/users/me` | Fetch authenticated user profile |
+| `PATCH` | `/api/users/me` | Update name / profile |
+| `DELETE` | `/api/users/me` | Self-service account deletion |
+| `POST` | `/api/auth/change-password` | Change password (authenticated) |
+| `POST` | `/api/auth/set-password` | Set password for OAuth-only accounts |
+| `GET` | `/api/auth/sessions` | List active sessions |
+| `POST` | `/api/auth/sessions/revoke` | Revoke single active session |
+| `POST` | `/api/auth/sessions/revoke-all` | Revoke all other active sessions |
+| `GET` | `/api/auth/accounts` | List linked OAuth accounts |
+| `POST` | `/api/auth/accounts/unlink` | Unlink an OAuth account |
 
 ### Admin Management (`/api/users`)
 
-| Method | Endpoint                                    | Guard             | Description                                   |
-| ------ | ------------------------------------------- | ----------------- | --------------------------------------------- |
-| `GET`  | `/api/users`                                | `@Roles('admin')` | Paginated user listing (search, filter, sort) |
-| `GET`  | `/api/users/:id`                            | `@Roles('admin')` | User details with ban history                 |
-| `POST` | `/api/users/:id/ban`                        | `@Roles('admin')` | Ban user with reason                          |
-| `POST` | `/api/users/:id/unban`                      | `@Roles('admin')` | Unban user                                    |
-| `POST` | `/api/users/:id/role`                       | `@Roles('admin')` | Grant/revoke admin role                       |
-| `GET`  | `/api/users/:id/sessions`                   | `@Roles('admin')` | View all active/revoked user sessions         |
-| `POST` | `/api/users/:id/sessions/:sessionId/revoke` | `@Roles('admin')` | Admin revoke specific user session            |
-| `GET`  | `/api/users/audit-logs`                     | `@Roles('admin')` | Paginated admin audit log table               |
+| Method | Endpoint | Guard | Description |
+|---|---|---|---|
+| `GET` | `/api/users` | `@Roles('admin')` | Paginated user listing (search, filter, sort) |
+| `GET` | `/api/users/:id` | `@Roles('admin')` | User details with ban history |
+| `POST` | `/api/users/:id/ban` | `@Roles('admin')` | Ban user with reason |
+| `POST` | `/api/users/:id/unban` | `@Roles('admin')` | Unban user |
+| `POST` | `/api/users/:id/role` | `@Roles('admin')` | Grant/revoke admin role |
+| `GET` | `/api/users/:id/sessions` | `@Roles('admin')` | View all active/revoked user sessions |
+| `POST` | `/api/users/:id/sessions/:sessionId/revoke` | `@Roles('admin')` | Admin revoke specific user session |
+| `GET` | `/api/users/audit-logs` | `@Roles('admin')` | Paginated admin audit log table |
 
 ### Health Check
 
-| Method | Endpoint      | Description                                                    |
-| ------ | ------------- | -------------------------------------------------------------- |
-| `GET`  | `/api/health` | Public status endpoint (`{ status: 'ok', timestamp: string }`) |
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/health` | Public status endpoint with live PostgreSQL and Redis pings |
 
 ---
 
@@ -245,7 +254,7 @@ npm run drizzle:studio
 
 ### Stateless JWT & Redis Authorization Version (`authz_version`)
 
-```
+```text
 [ Incoming Request ]
        │
        ▼
@@ -264,20 +273,22 @@ npm run drizzle:studio
 
 ## 📂 Project Structure
 
-```
-back-end/
+```text
+apps/backend/
 ├── drizzle/                          # Database migration SQL files
 ├── docker-compose.yml                # PostgreSQL & Redis container config
 ├── src/
-│   ├── main.ts                       # App entry point & global interceptors/pipes
-│   ├── app.module.ts                 # Root module configuration
+│   ├── main.ts                       # App entry point, CORS, and pipes
+│   ├── app.module.ts                 # Root module with APP_FILTER, APP_GUARD, APP_INTERCEPTOR
 │   ├── auth/                         # Authentication domain
 │   │   ├── auth.controller.ts
-│   │   └── services/                 # 17 single-purpose services (auth, password, verification, sessions, oauth)
+│   │   └── services/                 # Single-purpose services (auth, password, verification, sessions, oauth)
 │   ├── users/                        # User domain & Admin management
 │   │   ├── users.controller.ts
 │   │   └── services/                 # Admin, profile, and user services
 │   ├── common/                       # Infrastructure & shared modules
+│   │   ├── config/                   # Fail-fast env validation (env.validation.ts)
+│   │   ├── filters/                  # HttpExceptionFilter
 │   │   ├── guards/                   # AuthGuard, RolesGuard, CustomThrottlerGuard
 │   │   ├── interceptors/             # IdempotencyInterceptor, LoggingInterceptor
 │   │   ├── redis/                    # RedisModule, RedisService, AuthzVersionService

@@ -1,13 +1,13 @@
 # Project Reference
 
-> **Last updated:** 2026-08-12 08:50  
-> **Project name:** project-name-frontend
+> **Last updated:** 2026-08-15 12:00  
+> **Project name:** frontend
 
 ---
 
 ## Project Overview
 
-A **Next.js 16 front-end application** that provides the complete user-facing interface for the authentication platform. The application is a standalone SPA-style client (not a monorepo) that communicates with the NestJS back-end REST API via server actions and an Axios-based API client.
+A **Next.js 16 front-end application** that provides the complete user-facing interface for the authentication platform. The application is part of a `pnpm` monorepo workspace under `apps/frontend` that communicates with the NestJS back-end REST API via server actions and an Axios-based API client.
 
 ### Business Domain
 
