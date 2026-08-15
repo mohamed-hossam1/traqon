@@ -1,13 +1,13 @@
 # Project Reference
 
-> **Last updated:** 2026-08-13 00:52  
+> **Last updated:** 2026-08-14 19:05  
 > **Project name:** backend
 
 ---
 
 ## Project Overview
 
-A **NestJS v11 authentication API** that provides a complete, production-ready auth system. The application is a standalone REST API (not a monorepo) with the global route prefix `/api`.
+A **NestJS v11 authentication API** that provides a complete, production-ready auth system. The application is part of a `pnpm` monorepo workspace under `apps/backend` with the global route prefix `/api`.
 
 ### Business Domain
 
@@ -38,7 +38,10 @@ User identity and access management — registration, login, email verification,
 | API Idempotency | Redis-backed header lock (`X-Idempotency-Key`) for safe request retries |
 | API Rate Limiting | Redis-backed rate limiting (`@nestjs/throttler` + `RedisThrottlerStorageService` + `CustomThrottlerGuard`) with per-route overrides on sensitive auth endpoints |
 | HTTP Logging | Global `LoggingInterceptor` tracking request duration, HTTP status code, client IP, User ID, and User Agent |
-| Health Check | Public status endpoint at `/api/health` |
+| Environment Validation | Fail-fast startup validation using `class-validator` schema (`env.validation.ts`) |
+| Global Exception Filter | Dependency-injected `HttpExceptionFilter` bound via `APP_FILTER` in `AppModule` |
+| CORS Configuration | Credentials-enabled CORS matching configurable `FRONTEND_URL` |
+| Active Health Check | Public health status endpoint at `/api/health` performing live PostgreSQL and Redis pings |
 | Swagger API docs | Auto-generated at `/api/docs` |
 
 ### Application Flow

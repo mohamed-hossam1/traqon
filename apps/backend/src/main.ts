@@ -5,7 +5,6 @@ import { ConfigService } from '@nestjs/config';
 import { setupSwagger } from './swagger-setup';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -16,6 +15,13 @@ async function bootstrap() {
 
   app.use(helmet());
   app.use(cookieParser());
+
+  const frontendUrl =
+    configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
+  app.enableCors({
+    origin: frontendUrl,
+    credentials: true,
+  });
 
   app.enableShutdownHooks();
 
@@ -28,8 +34,6 @@ async function bootstrap() {
       transform: true,
     }),
   );
-
-  app.useGlobalFilters(new HttpExceptionFilter());
 
   const isSwaggerEnabled =
     configService.get<string>('SWAGGER_ENABLED') === 'true';

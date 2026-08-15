@@ -11,7 +11,7 @@ export class AppController {
   @ApiOkResponse({ description: 'API Health Check Status' })
   @SkipThrottle()
   @Get('health')
-  getHealth() {
+  async getHealth() {
     return this.appService.getHealth();
   }
 }

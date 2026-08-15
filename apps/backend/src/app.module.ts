@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -14,10 +14,15 @@ import { RedisService } from './common/redis/redis.service';
 import { RedisThrottlerStorageService } from './common/throttler/redis-throttler-storage.service';
 import { CustomThrottlerGuard } from './common/guards/custom-throttler.guard';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { validateEnv } from './common/config/env.validation';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      validate: validateEnv,
+    }),
     RedisModule,
     ThrottlerModule.forRootAsync({
       imports: [RedisModule],
@@ -42,6 +47,10 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
   controllers: [AppController],
   providers: [
     AppService,
+    {
+      provide: APP_FILTER,
+      useClass: HttpExceptionFilter,
+    },
     {
       provide: APP_GUARD,
       useClass: CustomThrottlerGuard,
